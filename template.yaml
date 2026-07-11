@@ -19,6 +19,9 @@ Resources:
       Runtime: nodejs22.x
       Architectures:
         - arm64
+      # Hard cap on simultaneous invocations, so cost is bounded regardless
+      # of how much traffic (legitimate or abusive) hits the API.
+      ReservedConcurrentExecutions: 20
       Events:
         ApiRequest:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
