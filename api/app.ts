@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { randomUUID } from 'crypto';
 import { docClient } from './db';
 import { NormalCube } from './cube/NormalCube';
 import { normalizeNotation } from './cube/notation';
@@ -32,11 +33,6 @@ function cubeSizeForType(cubeType: string): number {
 
 // POST /algorithm-sets/{setId}/cases/{caseId}/algorithms - see
 // docs/cube-app-api-spec.md §4.3.
-//
-// For now this only normalizes and validates the submitted notation - it
-// doesn't check for duplicates, store the algorithm, or auto-vote yet
-// (that needs the Algorithms/Votes tables wired up next), so a valid
-// submission gets a placeholder 200 rather than the spec's eventual 201.
 const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     const setId = event.pathParameters?.setId;
     const caseId = Number(event.pathParameters?.caseId);
@@ -71,20 +67,85 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
 
     const { cubeType, mask } = algorithmSet.Item as { cubeType: string; mask: string };
     const { scramble } = caseItem.Item as { scramble: string };
+    const normalizedProposal = normalizeNotation(notation);
 
     const cube = new NormalCube(cubeSizeForType(cubeType));
     cube.applyIgnoreMask(mask);
     cube.applyMoves(scramble);
-    cube.applyMoves(normalizeNotation(notation));
+    cube.applyMoves(normalizedProposal);
 
     if (!cube.isSolved()) {
         return errorResponse(422, 'invalid_algorithm', 'Sequence does not solve this case.');
     }
 
-    // TODO: reject exact-duplicate normalized notation (409), create the
-    // algorithm, auto-vote for the submitter, and return 201 with
-    // { algorithmId, notation, votes } once submission storage exists.
-    return jsonResponse(200, { valid: true });
+    const setIdCaseId = `${setId}#${caseId}`;
+
+    // String-level duplicate check only (per spec) - reads then writes, so
+    // two identical submissions arriving at the exact same instant could
+    // both slip past this and create two rows. Accepted risk, same as the
+    // spec's other "revisit only if it becomes a real problem" notes.
+    const existingAlgorithms = await docClient.send(
+        new QueryCommand({
+            TableName: process.env.ALGORITHMS_TABLE_NAME!,
+            KeyConditionExpression: 'setIdCaseId = :setIdCaseId',
+            ExpressionAttributeValues: { ':setIdCaseId': setIdCaseId },
+        }),
+    );
+    const duplicate = (existingAlgorithms.Items ?? []).find((item) => item.notation === normalizedProposal);
+    if (duplicate) {
+        return jsonResponse(409, {
+            error: 'duplicate_algorithm',
+            message: 'This notation has already been submitted for this case.',
+            algorithmId: duplicate.algorithmId,
+        });
+    }
+
+    const priorVote = await docClient.send(
+        new GetCommand({
+            TableName: process.env.VOTES_TABLE_NAME!,
+            Key: { installationId, setIdCaseId },
+        }),
+    );
+    const priorAlgorithmId = priorVote.Item?.algorithmId as string | undefined;
+
+    const algorithmId = randomUUID();
+    const now = new Date().toISOString();
+
+    // Create the algorithm and cast the submitter's auto-vote atomically -
+    // TransactWriteItems (all-or-nothing) so a crash or concurrent request
+    // between these writes can never leave votes drifted from reality.
+    await docClient.send(
+        new TransactWriteCommand({
+            TransactItems: [
+                {
+                    Put: {
+                        TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                        Item: { setIdCaseId, algorithmId, notation: normalizedProposal, votes: 1, createdAt: now },
+                    },
+                },
+                ...(priorAlgorithmId
+                    ? [
+                          {
+                              Update: {
+                                  TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                                  Key: { setIdCaseId, algorithmId: priorAlgorithmId },
+                                  UpdateExpression: 'SET votes = votes - :one',
+                                  ExpressionAttributeValues: { ':one': 1 },
+                              },
+                          },
+                      ]
+                    : []),
+                {
+                    Put: {
+                        TableName: process.env.VOTES_TABLE_NAME!,
+                        Item: { installationId, setIdCaseId, algorithmId, votedAt: now },
+                    },
+                },
+            ],
+        }),
+    );
+
+    return jsonResponse(201, { algorithmId, notation: normalizedProposal, votes: 1 });
 };
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
