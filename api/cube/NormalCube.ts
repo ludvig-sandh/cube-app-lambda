@@ -85,6 +85,25 @@ export class NormalCube {
         return true;
     }
 
+    // Blanks every cell the mask marks "don't care" (the char '.') to
+    // 'none', mutating this cube in place - so isSolved() (which already
+    // treats 'none' as a wildcard) skips them. Called on a fresh cube
+    // before scrambling it with a case's notation, so the wildcards ride
+    // along with whatever the scramble does to those cells, landing
+    // wherever they need to for a correct solve. mask must have the same
+    // dimensions as this cube's grid (one line per row, one char per cell).
+    applyIgnoreMask(mask: string): void {
+        const rows = mask.split('\n');
+        for (let y = 0; y < this.gridHeight; y++) {
+            const row = rows[y];
+            for (let x = 0; x < this.gridWidth; x++) {
+                if (row[x] === '.') {
+                    this.grid[x][y] = 'none';
+                }
+            }
+        }
+    }
+
     applyMoves(notation: string): void {
         const turns = notation.split(' ').filter((part) => part.length > 0);
         for (const turn of turns) {

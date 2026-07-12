@@ -151,3 +151,60 @@ describe('NormalCube.isSolved()', () => {
         expect(cube.isSolved()).toBe(true);
     });
 });
+
+describe('NormalCube.applyIgnoreMask()', () => {
+    const cell = (cube: NormalCube, x: number, y: number): string =>
+        (cube as unknown as { grid: string[][] }).grid[x][y];
+
+    it('blanks only the masked cells to none, leaving the rest untouched', () => {
+        const cube = new NormalCube(3);
+        const width = 12; // size(3) * 4
+        const rows = Array.from({ length: 9 }, () => '#'.repeat(width)); // size(3) * 3
+        rows[3] = '.'.repeat(width); // last-layer belt row
+        cube.applyIgnoreMask(rows.join('\n'));
+
+        expect(cell(cube, 4, 3)).toBe('none'); // in the masked row
+        expect(cell(cube, 4, 4)).toBe('front'); // outside the masked row, untouched
+    });
+});
+
+describe('OLL-style case validation (mask applied fresh on every request)', () => {
+    // Nothing is precomputed or stored as a derived cube state: the DB just
+    // holds an algorithm set's mask (which cells it doesn't care about) and
+    // a case's scramble notation (plain moves). The Lambda builds the
+    // actual starting cube on every request: new cube -> applyIgnoreMask ->
+    // applyMoves(scramble). The wildcards ride along with whatever the
+    // scramble does to those cells since applyMoves() just permutes grid
+    // cells regardless of content - so plain isSolved() (which already
+    // treats 'none' as "don't care") is all validation ever needs.
+    const OLL_MASK = (() => {
+        const width = 12; // size(3) * 4
+        const rows = Array.from({ length: 9 }, () => '#'.repeat(width)); // size(3) * 3
+        rows[3] = '.'.repeat(width); // last-layer belt row: don't care
+        return rows.join('\n');
+    })();
+
+    const buildCase = (scramble: string): NormalCube => {
+        const cube = new NormalCube(3);
+        cube.applyIgnoreMask(OLL_MASK);
+        cube.applyMoves(scramble);
+        return cube;
+    };
+
+    it('is unsolved right after scrambling', () => {
+        const cube = buildCase("R U2 R' U' R U' R'"); // Sune's inverse
+        expect(cube.isSolved()).toBe(false);
+    });
+
+    it('is solved once the matching algorithm is applied', () => {
+        const cube = buildCase("R U2 R' U' R U' R'"); // Sune's inverse
+        cube.applyMoves("R U R' U R U2 R'"); // Sune
+        expect(cube.isSolved()).toBe(true);
+    });
+
+    it('stays unsolved if F2L gets disturbed along the way', () => {
+        const cube = buildCase("R U2 R' U' R U' R'");
+        cube.applyMoves('R'); // wrong move, disturbs F2L
+        expect(cube.isSolved()).toBe(false);
+    });
+});

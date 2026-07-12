@@ -24,12 +24,15 @@ Resources:
       ReservedConcurrentExecutions: 20
       Environment:
         Variables:
+          ALGORITHM_SETS_TABLE_NAME: !Ref AlgorithmSetsTable
           CASES_TABLE_NAME: !Ref CasesTable
           ALGORITHMS_TABLE_NAME: !Ref AlgorithmsTable
           VOTES_TABLE_NAME: !Ref VotesTable
       # One CRUD policy per table, scoped to just that table's ARN (plus its
       # indexes) - narrower than a blanket DynamoDB:* IAM statement.
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AlgorithmSetsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CasesTable
         - DynamoDBCrudPolicy:
@@ -56,9 +59,33 @@ Resources:
         EntryPoints:
         - app.ts
 
-  # Internal-only: (setId, caseId) -> scramble state + cubeType, used by the
-  # submission Lambda to validate proposed algorithms. Never exposed via a
-  # public endpoint.
+  # Internal-only, one row per algorithm set (e.g. "OLL"): cubeType, plus
+  # mask - the string NormalCube.applyIgnoreMask() takes, marking which
+  # cells this set doesn't care about (e.g. OLL marks the last layer's side
+  # stickers as don't-care, since OLL only orients - it doesn't permute).
+  # Nothing is precomputed from this at seed time - the submission Lambda
+  # applies it fresh on every request (new NormalCube -> applyIgnoreMask ->
+  # applyMoves(the case's scramble)) to build that request's starting cube.
+  # Shared by every case in the set, so it lives here once rather than
+  # being repeated per case.
+  AlgorithmSetsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AlgorithmSets
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: setId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: setId
+          KeyType: HASH
+
+  # Internal-only: (setId, caseId) -> scramble (plain move notation, e.g.
+  # "R U2 R' U' R U' R'"), used by the submission Lambda to build that
+  # case's starting cube on every request (see AlgorithmSetsTable above).
+  # Just the raw scramble is stored - no precomputed/derived cube state -
+  # so there's nothing to keep in sync if the mask or scramble ever change.
+  # Never exposed via a public endpoint.
   CasesTable:
     Type: AWS::DynamoDB::Table
     Properties:

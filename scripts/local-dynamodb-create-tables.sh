@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Creates the Cases/Algorithms/Votes tables against DynamoDB Local, mirroring
-# the table definitions in template.yaml exactly (same names, keys, GSI) so
-# local behavior matches what gets deployed. Safe to re-run - skips any
-# table that already exists.
+# Creates the AlgorithmSets/Cases/Algorithms/Votes tables against DynamoDB
+# Local, mirroring the table definitions in template.yaml exactly (same
+# names, keys, GSI) so local behavior matches what gets deployed. Safe to
+# re-run - skips any table that already exists.
 #
 # Usage: ./scripts/local-dynamodb-create-tables.sh
 # Requires: `docker compose up -d` already running dynamodb-local on :8000.
@@ -19,6 +19,21 @@ export AWS_DEFAULT_REGION="us-east-1"
 table_exists() {
     aws dynamodb describe-table --endpoint-url "$ENDPOINT" --table-name "$1" >/dev/null 2>&1
 }
+
+if table_exists AlgorithmSets; then
+    echo "AlgorithmSets table already exists, skipping"
+else
+    aws dynamodb create-table \
+        --endpoint-url "$ENDPOINT" \
+        --table-name AlgorithmSets \
+        --attribute-definitions \
+            AttributeName=setId,AttributeType=S \
+        --key-schema \
+            AttributeName=setId,KeyType=HASH \
+        --billing-mode PAY_PER_REQUEST \
+        >/dev/null
+    echo "Created AlgorithmSets table"
+fi
 
 if table_exists Cases; then
     echo "Cases table already exists, skipping"

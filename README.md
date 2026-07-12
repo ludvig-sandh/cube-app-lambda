@@ -51,6 +51,34 @@ Tear it down (also wipes local data unless you drop `-v`):
 docker compose down -v
 ```
 
+### Seeding algorithm sets
+
+Drop a `seed-data/<SETID>.json` file per set (e.g. `seed-data/OLL.json`) -
+the set's ID comes from the file name:
+
+```json
+{
+  "cubeType": "3x3",
+  "mask": "############\n############\n############\n............\n############\n############\n############\n############\n############",
+  "algorithms": ["R U R' U R U2 R'", "..."]
+}
+```
+
+`mask` is the string `NormalCube.applyIgnoreMask()` takes - which cells this
+set doesn't care about (e.g. OLL wildcards the last layer's side stickers,
+one line per grid row, `.` for don't-care). `algorithms` is one *solving*
+algorithm per case, in case order.
+
+Then run (with `docker compose up -d` running):
+
+```bash
+cd api && npm run seed
+```
+
+This seeds every `seed-data/*.json` file in one pass.
+Safe to re-run - overwrites rather than duplicating. Adding a new set is
+just dropping in another `seed-data/<SETID>.json` file.
+
 Install dependencies:
 
 ```bash

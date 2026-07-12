@@ -11,5 +11,10 @@
       "skipLibCheck": true,
       "forceConsistentCasingInFileNames": true,
     },
-    "exclude": ["node_modules", "**/*.test.ts"]
+    "exclude": ["node_modules", "**/*.test.ts"],
+    "ts-node": {
+      "compilerOptions": {
+        "module": "commonjs"
+      }
+    }
   }
