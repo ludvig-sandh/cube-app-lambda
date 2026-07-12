@@ -94,14 +94,16 @@ sam build
 Invoke the function directly with a sample event (requires Docker running):
 
 ```bash
-sam local invoke ApiFunction --event events/event.json
+sam local invoke ApiFunction --event events/submit-algorithm-event.json
 ```
 
 Run a local API Gateway emulator on port 3000 (requires Docker running):
 
 ```bash
 sam local start-api
-curl http://localhost:3000/hello
+curl -X POST http://localhost:3000/algorithm-sets/OLL/cases/1/algorithms \
+  -H "Content-Type: application/json" \
+  -d '{"installationId": "test", "notation": "R U R'"'"' U R U2 R'"'"'"}'
 ```
 
 Run unit tests:

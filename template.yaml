@@ -40,15 +40,10 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref VotesTable
       Events:
-        ApiRequest:
+        SubmitAlgorithmRequest:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /hello
-            Method: get
-        CheckIdentityRequest:
-          Type: Api
-          Properties:
-            Path: /check-identity
+            Path: /algorithm-sets/{setId}/cases/{caseId}/algorithms
             Method: post
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
@@ -159,7 +154,7 @@ Outputs:
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   ApiUrl:
     Description: "API Gateway endpoint URL for Prod stage"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/hello/"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/"
   ApiFunction:
     Description: "Lambda Function ARN"
     Value: !GetAtt ApiFunction.Arn
