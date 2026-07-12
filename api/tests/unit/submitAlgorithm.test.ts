@@ -1,8 +1,9 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyResult } from 'aws-lambda';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import { lambdaHandler } from '../../app';
 import { docClient } from '../../db';
+import { buildEvent as buildBaseEvent } from './testHelpers';
 import { expect, describe, it, beforeEach } from '@jest/globals';
 
 process.env.ALGORITHM_SETS_TABLE_NAME = 'AlgorithmSets';
@@ -27,60 +28,14 @@ const SUNE = "R U R' U R U2 R'";
 const SUNE_INVERSE = "R U2 R' U' R U' R'";
 const SET_ID_CASE_ID = 'OLL#1';
 
-const baseEvent: APIGatewayProxyEvent = {
-    httpMethod: 'post',
-    body: '',
-    headers: {},
-    isBase64Encoded: false,
-    multiValueHeaders: {},
-    multiValueQueryStringParameters: {},
-    path: '/algorithm-sets/OLL/cases/1/algorithms',
-    pathParameters: { setId: 'OLL', caseId: '1' },
-    queryStringParameters: {},
-    requestContext: {
-        accountId: '123456789012',
-        apiId: '1234',
-        authorizer: {},
+const buildEvent = (overrides: Parameters<typeof buildBaseEvent>[0]) =>
+    buildBaseEvent({
         httpMethod: 'post',
-        identity: {
-            accessKey: '',
-            accountId: '',
-            apiKey: '',
-            apiKeyId: '',
-            caller: '',
-            clientCert: {
-                clientCertPem: '',
-                issuerDN: '',
-                serialNumber: '',
-                subjectDN: '',
-                validity: { notAfter: '', notBefore: '' },
-            },
-            cognitoAuthenticationProvider: '',
-            cognitoAuthenticationType: '',
-            cognitoIdentityId: '',
-            cognitoIdentityPoolId: '',
-            principalOrgId: '',
-            sourceIp: '',
-            user: '',
-            userAgent: '',
-            userArn: '',
-        },
         path: '/algorithm-sets/OLL/cases/1/algorithms',
-        protocol: 'HTTP/1.1',
-        requestId: 'c6af9ac6-7b61-11e6-9a41-93e8deadbeef',
-        requestTimeEpoch: 1428582896000,
-        resourceId: '123456',
-        resourcePath: '/algorithm-sets/{setId}/cases/{caseId}/algorithms',
-        stage: 'dev',
-    },
-    resource: '/algorithm-sets/{setId}/cases/{caseId}/algorithms',
-    stageVariables: {},
-};
-
-const buildEvent = (overrides: Partial<APIGatewayProxyEvent>): APIGatewayProxyEvent => ({
-    ...baseEvent,
-    ...overrides,
-});
+        pathParameters: { setId: 'OLL', caseId: '1' },
+        resource: '/algorithm-sets/{setId}/cases/{caseId}/algorithms',
+        ...overrides,
+    });
 
 describe('POST /algorithm-sets/{setId}/cases/{caseId}/algorithms', () => {
     beforeEach(() => {

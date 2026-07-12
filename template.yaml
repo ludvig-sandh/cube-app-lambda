@@ -40,11 +40,26 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref VotesTable
       Events:
-        SubmitAlgorithmRequest:
+        TopAlgorithmsRequest:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /algorithm-sets/{setId}/top-algorithms
+            Method: get
+        ListAlgorithmsRequest:
+          Type: Api
+          Properties:
+            Path: /algorithm-sets/{setId}/cases/{caseId}/algorithms
+            Method: get
+        SubmitAlgorithmRequest:
+          Type: Api
           Properties:
             Path: /algorithm-sets/{setId}/cases/{caseId}/algorithms
             Method: post
+        CastVoteRequest:
+          Type: Api
+          Properties:
+            Path: /algorithm-sets/{setId}/cases/{caseId}/vote
+            Method: put
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
