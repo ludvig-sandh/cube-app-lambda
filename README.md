@@ -10,13 +10,46 @@ A serverless application (AWS SAM) with a Lambda function triggered by API Gatew
 - `template.yaml` — SAM/CloudFormation template defining the Lambda function, API Gateway route, and (later) DynamoDB table.
 - `samconfig.toml` — saved parameters for `sam build` / `sam deploy` / `sam local`.
 
-## Prerequisites
-
-- **AWS CLI** and **AWS SAM CLI** — installed via Homebrew (`brew install awscli aws-sam-cli`).
-- **Docker Desktop** — installed at `/Applications/Docker.app`. SAM uses Docker to emulate the Lambda execution environment locally. **Launch Docker Desktop once and complete its first-run setup before using `sam local`.**
-- **AWS credentials** — needed only for `sam deploy` (not for local build/test). Configure with `aws configure`, or by creating `~/.aws/credentials` by hand.
-
 ## Local development
+
+### DynamoDB (local)
+
+The API is backed by three DynamoDB tables (`Cases`, `Algorithms`, `Votes` —
+see `docs/cube-app-api-spec.md` §3 for the schema). Locally these run in
+[DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html)
+via Docker instead of real AWS, so you can develop without any AWS
+credentials or cost.
+
+Start it (requires Docker running):
+
+```bash
+docker compose up -d
+```
+
+Create the tables (matches the schema in `template.yaml` exactly; safe to
+re-run, skips tables that already exist):
+
+```bash
+./scripts/local-dynamodb-create-tables.sh
+```
+
+Data persists to `./.dynamodb/` between restarts (gitignored). Poke at it
+directly with the AWS CLI pointed at the local endpoint, e.g.:
+
+```bash
+aws dynamodb list-tables --endpoint-url http://localhost:8000
+aws dynamodb scan --endpoint-url http://localhost:8000 --table-name Algorithms
+```
+
+(Any fake `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` will do — DynamoDB
+Local doesn't check them, but the AWS CLI still requires something to be
+set.)
+
+Tear it down (also wipes local data unless you drop `-v`):
+
+```bash
+docker compose down -v
+```
 
 Install dependencies:
 

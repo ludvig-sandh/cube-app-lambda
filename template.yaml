@@ -22,12 +22,31 @@ Resources:
       # Hard cap on simultaneous invocations, so cost is bounded regardless
       # of how much traffic (legitimate or abusive) hits the API.
       ReservedConcurrentExecutions: 20
+      Environment:
+        Variables:
+          CASES_TABLE_NAME: !Ref CasesTable
+          ALGORITHMS_TABLE_NAME: !Ref AlgorithmsTable
+          VOTES_TABLE_NAME: !Ref VotesTable
+      # One CRUD policy per table, scoped to just that table's ARN (plus its
+      # indexes) - narrower than a blanket DynamoDB:* IAM statement.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CasesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AlgorithmsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref VotesTable
       Events:
         ApiRequest:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /hello
             Method: get
+        CheckIdentityRequest:
+          Type: Api
+          Properties:
+            Path: /check-identity
+            Method: post
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
@@ -36,6 +55,76 @@ Resources:
         Sourcemap: true
         EntryPoints:
         - app.ts
+
+  # Internal-only: (setId, caseId) -> scramble state + cubeType, used by the
+  # submission Lambda to validate proposed algorithms. Never exposed via a
+  # public endpoint.
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Cases
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: setId
+          AttributeType: S
+        - AttributeName: caseId
+          AttributeType: N
+      KeySchema:
+        - AttributeName: setId
+          KeyType: HASH
+        - AttributeName: caseId
+          KeyType: RANGE
+
+  # PK setId#caseId (stored as attribute "setIdCaseId") groups every
+  # algorithm submitted for a case; SK algorithmId identifies one of them.
+  # The ByCaseVotes GSI reorders the same items by vote count so
+  # "top algorithm for a case" is a single cheap Query(Limit=1,
+  # ScanIndexForward=false) instead of a scan.
+  AlgorithmsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Algorithms
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: setIdCaseId
+          AttributeType: S
+        - AttributeName: algorithmId
+          AttributeType: S
+        - AttributeName: votes
+          AttributeType: N
+      KeySchema:
+        - AttributeName: setIdCaseId
+          KeyType: HASH
+        - AttributeName: algorithmId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ByCaseVotes
+          KeySchema:
+            - AttributeName: setIdCaseId
+              KeyType: HASH
+            - AttributeName: votes
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # PK installationId, SK setId#caseId (attribute "setIdCaseId") - one row
+  # per (install, case), so a device's vote on a case is a single overwrite
+  # rather than a growing list.
+  VotesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Votes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: installationId
+          AttributeType: S
+        - AttributeName: setIdCaseId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: installationId
+          KeyType: HASH
+        - AttributeName: setIdCaseId
+          KeyType: RANGE
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

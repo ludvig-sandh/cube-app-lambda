@@ -1,0 +1,13 @@
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: cube-app-dynamodb-local
+    ports:
+      - '8000:8000'
+    # -sharedDb: one database file, so every client (aws cli, Lambda, tests)
+    # sees the same tables no matter what fake credentials/region they pass.
+    # -dbPath: persist to a mounted volume so data survives container restarts.
+    command: '-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data'
+    working_dir: /home/dynamodblocal
+    volumes:
+      - ./.dynamodb:/home/dynamodblocal/data
