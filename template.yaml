@@ -10,6 +10,32 @@ Globals:
   Function:
     Timeout: 3
 
+Parameters:
+  # Table names are Parameters (not just literal strings inline on each
+  # table resource) so the Lambda's env vars can !Ref them directly. A
+  # !Ref to a resource's own attributes (e.g. !Ref AlgorithmSetsTable)
+  # doesn't resolve locally without a real deployed stack - SAM CLI falls
+  # back to the logical ID as a placeholder - but !Ref on a Parameter
+  # always resolves to its actual value, deployed or local.
+  AlgorithmSetsTableName:
+    Type: String
+    Default: AlgorithmSets
+  CasesTableName:
+    Type: String
+    Default: Cases
+  AlgorithmsTableName:
+    Type: String
+    Default: Algorithms
+  VotesTableName:
+    Type: String
+    Default: Votes
+  # Only set for local development, via `sam local start-api
+  # --parameter-overrides DynamoDBEndpointOverride=http://<host>:8000` -
+  # left blank for real deployments, so the SDK talks to real AWS DynamoDB.
+  DynamoDBEndpointOverride:
+    Type: String
+    Default: ''
+
 Resources:
   ApiFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -24,21 +50,22 @@ Resources:
       ReservedConcurrentExecutions: 20
       Environment:
         Variables:
-          ALGORITHM_SETS_TABLE_NAME: !Ref AlgorithmSetsTable
-          CASES_TABLE_NAME: !Ref CasesTable
-          ALGORITHMS_TABLE_NAME: !Ref AlgorithmsTable
-          VOTES_TABLE_NAME: !Ref VotesTable
+          ALGORITHM_SETS_TABLE_NAME: !Ref AlgorithmSetsTableName
+          CASES_TABLE_NAME: !Ref CasesTableName
+          ALGORITHMS_TABLE_NAME: !Ref AlgorithmsTableName
+          VOTES_TABLE_NAME: !Ref VotesTableName
+          DYNAMODB_ENDPOINT: !Ref DynamoDBEndpointOverride
       # One CRUD policy per table, scoped to just that table's ARN (plus its
       # indexes) - narrower than a blanket DynamoDB:* IAM statement.
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref AlgorithmSetsTable
+            TableName: !Ref AlgorithmSetsTableName
         - DynamoDBCrudPolicy:
-            TableName: !Ref CasesTable
+            TableName: !Ref CasesTableName
         - DynamoDBCrudPolicy:
-            TableName: !Ref AlgorithmsTable
+            TableName: !Ref AlgorithmsTableName
         - DynamoDBCrudPolicy:
-            TableName: !Ref VotesTable
+            TableName: !Ref VotesTableName
       Events:
         TopAlgorithmsRequest:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
@@ -81,7 +108,7 @@ Resources:
   AlgorithmSetsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: AlgorithmSets
+      TableName: !Ref AlgorithmSetsTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: setId
@@ -99,7 +126,7 @@ Resources:
   CasesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: Cases
+      TableName: !Ref CasesTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: setId
@@ -120,7 +147,7 @@ Resources:
   AlgorithmsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: Algorithms
+      TableName: !Ref AlgorithmsTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: setIdCaseId
@@ -150,7 +177,7 @@ Resources:
   VotesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: Votes
+      TableName: !Ref VotesTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: installationId

@@ -91,16 +91,24 @@ Build the function (compiles TypeScript via esbuild, output goes to `.aws-sam/bu
 sam build
 ```
 
-Invoke the function directly with a sample event (requires Docker running):
+Invoke the function directly with a sample event, wired to DynamoDB Local
+(requires `docker compose up -d` running). Without the two flags below, the
+Lambda's DynamoDB calls go to real AWS instead - `DynamoDBEndpointOverride`
+defaults to blank specifically so a real `sam deploy` never accidentally
+points at a local endpoint:
 
 ```bash
-sam local invoke ApiFunction --event events/submit-algorithm-event.json
+sam local invoke ApiFunction --event events/submit-algorithm-event.json \
+  --docker-network cube-app-lambda_default \
+  --parameter-overrides DynamoDBEndpointOverride=http://cube-app-dynamodb-local:8000
 ```
 
-Run a local API Gateway emulator on port 3000 (requires Docker running):
+Run a local API Gateway emulator on port 3000, same wiring:
 
 ```bash
-sam local start-api
+sam local start-api \
+  --docker-network cube-app-lambda_default \
+  --parameter-overrides DynamoDBEndpointOverride=http://cube-app-dynamodb-local:8000
 curl -X POST http://localhost:3000/algorithm-sets/OLL/cases/1/algorithms \
   -H "Content-Type: application/json" \
   -d '{"installationId": "test", "notation": "R U R'"'"' U R U2 R'"'"'"}'
