@@ -9,6 +9,17 @@ Description: >
 Globals:
   Function:
     Timeout: 3
+  Api:
+    # Overall (not per-caller) throttle on the whole API, applied at the
+    # API Gateway stage - independent of and in addition to
+    # ReservedConcurrentExecutions on the function itself. Steady-state 20
+    # req/s matches that concurrency cap; burst allows short spikes above
+    # it before requests start getting 429'd.
+    MethodSettings:
+      - ResourcePath: '/*'
+        HttpMethod: '*'
+        ThrottlingRateLimit: 20
+        ThrottlingBurstLimit: 40
 
 Parameters:
   # Table names are Parameters (not just literal strings inline on each
