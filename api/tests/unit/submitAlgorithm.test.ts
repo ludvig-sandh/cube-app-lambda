@@ -203,6 +203,33 @@ describe('POST /algorithm-sets/{setId}/cases/{caseId}/algorithms', () => {
         });
     });
 
+    it('returns 400 when notation exceeds the max character length', async () => {
+        const tooLong = 'R '.repeat(101); // 202 raw characters
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: tooLong }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(400);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_request',
+            message: 'notation must be at most 200 characters.',
+        });
+        // Rejected before any DB round trip - a cheap, purely local check
+        // on the raw input, before normalizing or simulating anything.
+        expect(ddbMock.commandCalls(GetCommand)).toHaveLength(0);
+    });
+
+    it('accepts notation at exactly the max character length', async () => {
+        // 100 R's obviously won't solve the case, so this exercises the
+        // length check passing through to the (mocked) DB reads rather
+        // than being rejected at the length gate.
+        const atLimit = 'R '.repeat(100); // exactly 200 characters
+        expect(atLimit).toHaveLength(200);
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: atLimit }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).not.toEqual(400);
+    });
+
     it('returns 500 when the request body is not valid JSON', async () => {
         const event = buildEvent({ body: 'not json' });
         const result = await lambdaHandler(event);

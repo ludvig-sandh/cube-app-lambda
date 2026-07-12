@@ -31,6 +31,8 @@ function cubeSizeForType(cubeType: string): number {
     return parseInt(cubeType.split('x')[0], 10);
 }
 
+const MAX_NOTATION_LENGTH = 200;
+
 // GET /algorithm-sets/{setId}/top-algorithms - see
 // docs/cube-app-api-spec.md §4.1.
 const getTopAlgorithms = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
@@ -232,6 +234,11 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
     if (typeof installationId !== 'string' || typeof notation !== 'string') {
         return errorResponse(400, 'invalid_request', 'Missing or invalid "installationId"/"notation" field.');
     }
+    if (notation.length > MAX_NOTATION_LENGTH) {
+        return errorResponse(400, 'invalid_request', `notation must be at most ${MAX_NOTATION_LENGTH} characters.`);
+    }
+
+    const normalizedProposal = normalizeNotation(notation);
 
     const algorithmSet = await docClient.send(
         new GetCommand({
@@ -255,7 +262,6 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
 
     const { cubeType, mask } = algorithmSet.Item as { cubeType: string; mask: string };
     const { scramble } = caseItem.Item as { scramble: string };
-    const normalizedProposal = normalizeNotation(notation);
 
     const cube = new NormalCube(cubeSizeForType(cubeType));
     cube.applyIgnoreMask(mask);
