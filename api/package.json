@@ -9,7 +9,8 @@
     "lint": "eslint '**/*.ts' --quiet --fix",
     "compile": "tsc",
     "test": "npm run compile && npm run unit",
-    "seed": "ts-node scripts/seed-algorithm-sets.ts"
+    "seed": "ts-node scripts/seed-algorithm-sets.ts",
+    "check-orientation": "ts-node scripts/check-case-orientation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1085.0",

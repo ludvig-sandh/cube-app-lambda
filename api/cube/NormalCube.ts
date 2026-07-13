@@ -63,12 +63,32 @@ export class NormalCube {
         return true;
     }
 
+    // Solved if isSolvedExact() passes with 0-3 extra trailing U turns
+    // (AUF - "adjust U face") applied first. A last-layer algorithm (PLL in
+    // particular) that's otherwise correct often finishes with the last
+    // layer's permutation right but rotated relative to the sides by some
+    // multiple of a quarter turn - speedcubers always allow a free U/U2/U'
+    // to line that up, so the validator should too. This never loosens
+    // OLL-style checks: a face that's already internally uniform stays
+    // uniform under any U rotation, and a face that isn't uniform can't be
+    // made uniform just by permuting its own stickers.
+    isSolved(): boolean {
+        const trial = this.clone();
+        for (let auf = 0; auf < 4; auf++) {
+            if (trial.isSolvedExact()) {
+                return true;
+            }
+            trial.applyTurn('U');
+        }
+        return false;
+    }
+
     // Solved means every face shows at most one color - not that each
     // sticker is back on its original face. This makes the check orientation
     // -independent (a pure rotation of a solved cube is still solved), and
     // tolerant of 'none' cells representing pieces a particular case doesn't
     // care about (e.g. a case that only scrambles part of the cube).
-    isSolved(): boolean {
+    private isSolvedExact(): boolean {
         const colorByFace = new Map<Side, Side>();
         for (let x = 0; x < this.gridWidth; x++) {
             for (let y = 0; y < this.gridHeight; y++) {

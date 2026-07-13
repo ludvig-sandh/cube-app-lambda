@@ -192,6 +192,23 @@ describe('NormalCube.isSolved()', () => {
         }
         expect(cube.isSolved()).toBe(true);
     });
+
+    // AUF ("adjust U face") tolerance: a PLL algorithm that's otherwise
+    // correct often finishes with the last layer permuted right but rotated
+    // relative to the sides by some multiple of a quarter turn.
+    it.each([1, 2, 3])('is solved when only a trailing U (x%i) turn is needed (AUF)', (numTurns) => {
+        const cube = new NormalCube(3);
+        cube.applyMoves(Array(numTurns).fill('U').join(' '));
+        expect(cube.isSolved()).toBe(true);
+    });
+
+    it('does not mutate the cube while checking for AUF', () => {
+        const cube = new NormalCube(3);
+        cube.applyMoves('U');
+        const before = cube.clone();
+        cube.isSolved();
+        expect(cube.equals(before)).toBe(true);
+    });
 });
 
 describe('NormalCube.applyIgnoreMask()', () => {
