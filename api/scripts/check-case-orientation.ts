@@ -1,26 +1,8 @@
-// Sanity-checks every case's scramble, for a given algorithm set, as
-// currently stored in DynamoDB (Cases table) - the same data the submission
-// Lambda reads to validate proposed algorithms (see submitAlgorithm in
-// app.ts and docs/cube-app-api-spec.md §3).
-//
-// isSolved() (and by extension the whole submit-validation flow) is
-// intentionally orientation-agnostic: it only checks that each face
-// position is internally uniform, not which physical face ended up there
-// (see NormalCube.isSolved()'s comment). So nothing in the app itself would
-// notice if a scramble's embedded x/z rotations, or an unbalanced M/E/S
-// slice turn, left the case's messed-up layer sitting on some face other
-// than U - which would silently break the mask (written assuming the
-// "don't care" row sits adjacent to U) without ever surfacing as a
-// validation failure.
-//
-// Face centers are the tell: ordinary face turns and y rotations can never
-// change which face's original color sits in that face's OWN center (a
-// physical invariant of a real 3x3 - it's exactly why M/E/S exist; see
-// NormalCube's M()/E()/S() comments). So for each case we start from
-// solved, apply the DB's stored scramble, and check that U's center is
-// still showing "top" and D's is still showing "bottom" - allowing any
-// number of y rotations along the way, since those only ever permute the
-// four side faces.
+// Checks that each case's stored scramble (Cases table) leaves the U and D
+// face centers unmoved (mod y rotations) - i.e. the case still ends up on
+// top, not silently rotated onto another face by an unbalanced x/z or
+// M/E/S turn. isSolved() wouldn't catch that itself since it only checks
+// per-face uniformity, not which physical face ended up where.
 //
 // Usage: npm run check-orientation [setId]   (defaults to "OLL")
 // Env vars: DYNAMODB_ENDPOINT (default http://localhost:8000), AWS_REGION

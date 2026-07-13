@@ -1,16 +1,6 @@
-// Ported from the Swift `NormalCube` in the iOS app. Faithful translation of
-// the move logic; UIKit-specific rendering (getColor/CubeColorScheme) was
-// dropped since it has no equivalent here, and applyScramble(Scramble) was
-// collapsed into applyMoves(notation: string) since we don't have that
-// wrapper type on this side.
-//
-// Lowercase wide-move notation (r u f l d b), orientation rotations (x y z),
-// and slice moves (M E S) are supported. x/y/z always rotate the whole cube
-// regardless of any layer-count modifier a turn string might carry, since a
-// rotation isn't depth-scoped the way a face turn is. M/E/S are likewise
-// depth-fixed - always the single layer exactly between their two bounding
-// faces - so they're only meaningful on odd-sized cubes (3x3, 5x5, ...),
-// matching standard notation.
+// Ported from the Swift `NormalCube` in the iOS app.
+// Supports Singmaster notation, lowercase wide moves (r u f l d b), slice
+// moves (M E S - odd-size cubes only), and rotations (x y z).
 
 type Side = 'top' | 'left' | 'front' | 'right' | 'back' | 'bottom' | 'none';
 
@@ -63,15 +53,9 @@ export class NormalCube {
         return true;
     }
 
-    // Solved if isSolvedExact() passes with 0-3 extra trailing U turns
-    // (AUF - "adjust U face") applied first. A last-layer algorithm (PLL in
-    // particular) that's otherwise correct often finishes with the last
-    // layer's permutation right but rotated relative to the sides by some
-    // multiple of a quarter turn - speedcubers always allow a free U/U2/U'
-    // to line that up, so the validator should too. This never loosens
-    // OLL-style checks: a face that's already internally uniform stays
-    // uniform under any U rotation, and a face that isn't uniform can't be
-    // made uniform just by permuting its own stickers.
+    // Allows 0-3 trailing U turns (AUF) before declaring defeat, since a
+    // correct PLL algorithm may finish with the last layer permuted right
+    // but rotated relative to the sides.
     isSolved(): boolean {
         const trial = this.clone();
         for (let auf = 0; auf < 4; auf++) {
@@ -83,13 +67,14 @@ export class NormalCube {
         return false;
     }
 
-    // Solved means every face shows at most one color - not that each
-    // sticker is back on its original face. This makes the check orientation
-    // -independent (a pure rotation of a solved cube is still solved), and
-    // tolerant of 'none' cells representing pieces a particular case doesn't
-    // care about (e.g. a case that only scrambles part of the cube).
+    // Solved means each face has at most one color and each color sits on
+    // at most one face (both directions needed - either alone allows a
+    // color to leak across faces). Ignores 'none' cells (cases that don't
+    // scramble the whole cube) and doesn't care which face ends up where
+    // (a pure rotation of a solved cube still counts as solved).
     private isSolvedExact(): boolean {
         const colorByFace = new Map<Side, Side>();
+        const faceByColor = new Map<Side, Side>();
         for (let x = 0; x < this.gridWidth; x++) {
             for (let y = 0; y < this.gridHeight; y++) {
                 const face = this.getSide(x, y);
@@ -103,18 +88,20 @@ export class NormalCube {
                 } else if (seenColor !== color) {
                     return false;
                 }
+
+                const seenFace = faceByColor.get(color);
+                if (seenFace === undefined) {
+                    faceByColor.set(color, face);
+                } else if (seenFace !== face) {
+                    return false;
+                }
             }
         }
         return true;
     }
 
-    // Blanks every cell the mask marks "don't care" (the char '.') to
-    // 'none', mutating this cube in place - so isSolved() (which already
-    // treats 'none' as a wildcard) skips them. Called on a fresh cube
-    // before scrambling it with a case's notation, so the wildcards ride
-    // along with whatever the scramble does to those cells, landing
-    // wherever they need to for a correct solve. mask must have the same
-    // dimensions as this cube's grid (one line per row, one char per cell).
+    // Blanks every '.' cell in the mask to 'none' so isSolved() skips it.
+    // mask must have the same dimensions as this cube's grid.
     applyIgnoreMask(mask: string): void {
         const rows = mask.split('\n');
         for (let y = 0; y < this.gridHeight; y++) {
@@ -249,9 +236,7 @@ export class NormalCube {
         this.rotateSide(0, this.size, this.size);
     }
 
-    // The 4-way cycle L() repeats per depth, factored out so M() (the
-    // middle slice - the single layer exactly between L and R) can reuse it
-    // without L's face rotation, which only applies to the outermost layer.
+    // One depth of L()'s cycle, without L's own face rotation - reused by M().
     private LSlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {
@@ -271,8 +256,7 @@ export class NormalCube {
         this.rotateSide(this.size, this.size, this.size);
     }
 
-    // See LSlice() - same idea, factored out so S() (the standing slice,
-    // between F and B) can reuse F's cycle without its face rotation.
+    // One depth of F()'s cycle, without F's own face rotation - reused by S().
     private FSlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {
@@ -322,8 +306,7 @@ export class NormalCube {
         this.rotateSide(this.size, this.size * 2, this.size);
     }
 
-    // See LSlice() - same idea, factored out so E() (the equator slice,
-    // between U and D) can reuse D's cycle without its face rotation.
+    // One depth of D()'s cycle, without D's own face rotation - reused by E().
     private DSlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {
@@ -335,12 +318,9 @@ export class NormalCube {
         }
     }
 
-    // Whole-cube rotation around the R/L axis, in R's direction. Turning R
-    // itself across every layer already produces the correct ring-cycle for
-    // the whole cube (that's exactly what "R with all layers" means), but it
-    // never touches the L face's own facelets, so those need a separate
-    // spin - in the reverse direction, since L and R spin with opposite
-    // handedness when sharing a rotation axis (each viewed face-on).
+    // Whole-cube rotation around the R/L axis, in R's direction: R(size)
+    // handles every layer's cycle, plus L's own face needs a reverse spin
+    // (L and R turn with opposite handedness on a shared axis).
     private x(): void {
         const { size } = this;
         this.R(size);

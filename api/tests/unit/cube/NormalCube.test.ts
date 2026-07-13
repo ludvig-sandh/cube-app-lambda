@@ -193,6 +193,22 @@ describe('NormalCube.isSolved()', () => {
         expect(cube.isSolved()).toBe(true);
     });
 
+    // Masking everything but the top face, then a single R, carries 3 of
+    // its 9 "top"-colored stickers onto the back face - both faces stay
+    // internally uniform, so this only fails if colors are checked too.
+    it('is not solved when one color ends up scattered across two faces', () => {
+        const cube = new NormalCube(3);
+        for (let x = 0; x < 12; x++) {
+            for (let y = 0; y < 9; y++) {
+                if (!(x >= 3 && x <= 5 && y <= 2)) {
+                    setCell(cube, x, y, 'none');
+                }
+            }
+        }
+        cube.applyMoves('R');
+        expect(cube.isSolved()).toBe(false);
+    });
+
     // AUF ("adjust U face") tolerance: a PLL algorithm that's otherwise
     // correct often finishes with the last layer permuted right but rotated
     // relative to the sides by some multiple of a quarter turn.

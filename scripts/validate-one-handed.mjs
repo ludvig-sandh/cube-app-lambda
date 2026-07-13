@@ -1,28 +1,13 @@
-// Validates a one-handed-friendly algorithm set (e.g. seed-data/OLL-OH.json)
-// by submitting each algorithm to its corresponding two-handed set via the
-// API (e.g. "OLL"), relying on the submit endpoint's own cube-solve
-// validation (docs/cube-app-api-spec.md §4.3) instead of re-implementing it
-// here.
+// Validates a one-handed algorithm set (e.g. seed-data/OLL-OH.json) by
+// submitting each algorithm, in case order, to its two-handed counterpart
+// via the API (OLL-OH -> OLL). A 201/409 response means the submit
+// endpoint's own cube-solve validation confirmed it solves that case; 422
+// means it doesn't.
 //
-// The one-handed set's algorithms are assumed to be in the same case order
-// as the target set (both have the same number of entries) - so
-// algorithms[i] is submitted against case i+1 of the target set.
-//
-// A 201 (created) or 409 (duplicate_algorithm) response means the algorithm
-// actually solves that case - the submit Lambda only reaches either of
-// those after its cube simulation confirms the solve. A 422
-// (invalid_algorithm) means it does not solve that case, and needs manual
-// attention.
-//
-// Usage:
-//   node scripts/validate-one-handed.mjs <ohSetId> [baseUrl]
+// Usage: node scripts/validate-one-handed.mjs <ohSetId> [baseUrl]
 // e.g. node scripts/validate-one-handed.mjs PLL-OH
-// Derives the target set by stripping the trailing "-OH" (PLL-OH -> PLL),
-// and reads algorithms from seed-data/<ohSetId>.json.
-// baseUrl defaults to http://localhost:3000 (sam local start-api - see
-// README.md). Requires DynamoDB Local seeded with `npm run seed`
-// (api/scripts/seed-algorithm-sets.ts) so the target set's Cases table has
-// scrambles for every case.
+// baseUrl defaults to http://localhost:3000 (sam local start-api). Requires
+// DynamoDB Local seeded via `npm run seed` (api/scripts/seed-algorithm-sets.ts).
 
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
