@@ -34,6 +34,48 @@ describe('NormalCube', () => {
         expect(cube.equals(new NormalCube(3))).toBe(true);
     });
 
+    it.each(['r', 'l', 'f', 'b', 'u', 'd'])(
+        'returns to the exact initial state after four %s turns (lowercase wide-move notation)',
+        (letter) => {
+            const cube = new NormalCube(3);
+            cube.applyMoves(`${letter} ${letter} ${letter} ${letter}`);
+            expect(cube.equals(new NormalCube(3))).toBe(true);
+        },
+    );
+
+    it('a single lowercase wide move is not a no-op', () => {
+        const cube = new NormalCube(3);
+        cube.applyMoves('r');
+        expect(cube.equals(new NormalCube(3))).toBe(false);
+    });
+
+    it.each(['M', 'E', 'S'])('returns to the exact initial state after four %s turns', (letter) => {
+        const cube = new NormalCube(3);
+        cube.applyMoves(`${letter} ${letter} ${letter} ${letter}`);
+        expect(cube.equals(new NormalCube(3))).toBe(true);
+    });
+
+    it('a single slice move is not a no-op', () => {
+        const cube = new NormalCube(3);
+        cube.applyMoves('M');
+        expect(cube.equals(new NormalCube(3))).toBe(false);
+    });
+
+    // Pins down slice-move direction against the standard identities
+    // (rather than just checking "4 turns return to solved", which passes
+    // regardless of direction).
+    it.each([
+        ['x', "R M' L'"],
+        ['y', "U E' D'"],
+        ['z', "F S B'"],
+    ])('%s equals "%s"', (rotation, equivalent) => {
+        const rotated = new NormalCube(3);
+        rotated.applyMoves(rotation);
+        const composed = new NormalCube(3);
+        composed.applyMoves(equivalent);
+        expect(rotated.equals(composed)).toBe(true);
+    });
+
     it('supports wide moves on larger cubes', () => {
         const cube = new NormalCube(4);
         cube.applyMoves('Rw Rw Rw Rw');

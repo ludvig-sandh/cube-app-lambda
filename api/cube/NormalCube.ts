@@ -4,10 +4,13 @@
 // collapsed into applyMoves(notation: string) since we don't have that
 // wrapper type on this side.
 //
-// Lowercase wide-move notation (r u f l d b) and orientation rotations
-// (x y z) are supported. x/y/z always rotate the whole cube regardless of
-// any layer-count modifier a turn string might carry, since a rotation
-// isn't depth-scoped the way a face turn is.
+// Lowercase wide-move notation (r u f l d b), orientation rotations (x y z),
+// and slice moves (M E S) are supported. x/y/z always rotate the whole cube
+// regardless of any layer-count modifier a turn string might carry, since a
+// rotation isn't depth-scoped the way a face turn is. M/E/S are likewise
+// depth-fixed - always the single layer exactly between their two bounding
+// faces - so they're only meaningful on odd-sized cubes (3x3, 5x5, ...),
+// matching standard notation.
 
 type Side = 'top' | 'left' | 'front' | 'right' | 'back' | 'bottom' | 'none';
 
@@ -145,16 +148,22 @@ export class NormalCube {
     private getTurnFn(letter: string): (numLayersToTurn: number) => void {
         switch (letter) {
             case 'R':
+            case 'r':
                 return this.R.bind(this);
             case 'L':
+            case 'l':
                 return this.L.bind(this);
             case 'F':
+            case 'f':
                 return this.F.bind(this);
             case 'B':
+            case 'b':
                 return this.B.bind(this);
             case 'U':
+            case 'u':
                 return this.U.bind(this);
             case 'D':
+            case 'd':
                 return this.D.bind(this);
             case 'x':
                 return this.x.bind(this);
@@ -162,6 +171,12 @@ export class NormalCube {
                 return this.y.bind(this);
             case 'z':
                 return this.z.bind(this);
+            case 'M':
+                return this.M.bind(this);
+            case 'E':
+                return this.E.bind(this);
+            case 'S':
+                return this.S.bind(this);
             default:
                 // Unrecognized letter: no-op, matching the Swift original's fallback.
                 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -207,33 +222,46 @@ export class NormalCube {
     }
 
     private L(numLayersToTurn: number): void {
-        const { size, grid } = this;
         for (let layer = 0; layer < numLayersToTurn; layer++) {
-            for (let i = 0; i < size; i++) {
-                const temp = grid[size + layer][i];
-                grid[size + layer][i] = grid[size * 4 - 1 - layer][size * 2 - 1 - i];
-                grid[size * 4 - 1 - layer][size * 2 - 1 - i] = grid[size + layer][size * 2 + i];
-                grid[size + layer][size * 2 + i] = grid[size + layer][size + i];
-                grid[size + layer][size + i] = temp;
-            }
+            this.LSlice(layer);
         }
 
-        this.rotateSide(0, size, size);
+        this.rotateSide(0, this.size, this.size);
+    }
+
+    // The 4-way cycle L() repeats per depth, factored out so M() (the
+    // middle slice - the single layer exactly between L and R) can reuse it
+    // without L's face rotation, which only applies to the outermost layer.
+    private LSlice(layer: number): void {
+        const { size, grid } = this;
+        for (let i = 0; i < size; i++) {
+            const temp = grid[size + layer][i];
+            grid[size + layer][i] = grid[size * 4 - 1 - layer][size * 2 - 1 - i];
+            grid[size * 4 - 1 - layer][size * 2 - 1 - i] = grid[size + layer][size * 2 + i];
+            grid[size + layer][size * 2 + i] = grid[size + layer][size + i];
+            grid[size + layer][size + i] = temp;
+        }
     }
 
     private F(numLayersToTurn: number): void {
-        const { size, grid } = this;
         for (let layer = 0; layer < numLayersToTurn; layer++) {
-            for (let i = 0; i < size; i++) {
-                const temp = grid[size + i][size - 1 - layer];
-                grid[size + i][size - 1 - layer] = grid[size - 1 - layer][size * 2 - 1 - i];
-                grid[size - 1 - layer][size * 2 - 1 - i] = grid[size * 2 - 1 - i][size * 2 + layer];
-                grid[size * 2 - 1 - i][size * 2 + layer] = grid[size * 2 + layer][size + i];
-                grid[size * 2 + layer][size + i] = temp;
-            }
+            this.FSlice(layer);
         }
 
-        this.rotateSide(size, size, size);
+        this.rotateSide(this.size, this.size, this.size);
+    }
+
+    // See LSlice() - same idea, factored out so S() (the standing slice,
+    // between F and B) can reuse F's cycle without its face rotation.
+    private FSlice(layer: number): void {
+        const { size, grid } = this;
+        for (let i = 0; i < size; i++) {
+            const temp = grid[size + i][size - 1 - layer];
+            grid[size + i][size - 1 - layer] = grid[size - 1 - layer][size * 2 - 1 - i];
+            grid[size - 1 - layer][size * 2 - 1 - i] = grid[size * 2 - 1 - i][size * 2 + layer];
+            grid[size * 2 - 1 - i][size * 2 + layer] = grid[size * 2 + layer][size + i];
+            grid[size * 2 + layer][size + i] = temp;
+        }
     }
 
     private B(numLayersToTurn: number): void {
@@ -267,18 +295,24 @@ export class NormalCube {
     }
 
     private D(numLayersToTurn: number): void {
-        const { size, grid } = this;
         for (let layer = 0; layer < numLayersToTurn; layer++) {
-            for (let i = 0; i < size; i++) {
-                const temp = grid[size + i][size * 2 - 1 - layer];
-                grid[size + i][size * 2 - 1 - layer] = grid[i][size * 2 - 1 - layer];
-                grid[i][size * 2 - 1 - layer] = grid[size * 3 + i][size * 2 - 1 - layer];
-                grid[size * 3 + i][size * 2 - 1 - layer] = grid[size * 2 + i][size * 2 - 1 - layer];
-                grid[size * 2 + i][size * 2 - 1 - layer] = temp;
-            }
+            this.DSlice(layer);
         }
 
-        this.rotateSide(size, size * 2, size);
+        this.rotateSide(this.size, this.size * 2, this.size);
+    }
+
+    // See LSlice() - same idea, factored out so E() (the equator slice,
+    // between U and D) can reuse D's cycle without its face rotation.
+    private DSlice(layer: number): void {
+        const { size, grid } = this;
+        for (let i = 0; i < size; i++) {
+            const temp = grid[size + i][size * 2 - 1 - layer];
+            grid[size + i][size * 2 - 1 - layer] = grid[i][size * 2 - 1 - layer];
+            grid[i][size * 2 - 1 - layer] = grid[size * 3 + i][size * 2 - 1 - layer];
+            grid[size * 3 + i][size * 2 - 1 - layer] = grid[size * 2 + i][size * 2 - 1 - layer];
+            grid[size * 2 + i][size * 2 - 1 - layer] = temp;
+        }
     }
 
     // Whole-cube rotation around the R/L axis, in R's direction. Turning R
@@ -311,6 +345,22 @@ export class NormalCube {
         for (let t = 0; t < 3; t++) {
             this.rotateSide(size * 3, size, size);
         }
+    }
+
+    // Middle slice (between L and R), in L's direction - matches standard
+    // notation, where M is defined by the identity x = R M' L'.
+    private M(): void {
+        this.LSlice(Math.floor(this.size / 2));
+    }
+
+    // Equator slice (between U and D), in D's direction - see y = U E' D'.
+    private E(): void {
+        this.DSlice(Math.floor(this.size / 2));
+    }
+
+    // Standing slice (between F and B), in F's direction - see z = F S B'.
+    private S(): void {
+        this.FSlice(Math.floor(this.size / 2));
     }
 
     // Rotates a size x size subgrid given its top-left corner (startX, startY)
