@@ -153,7 +153,45 @@ describe('findInvalidMove', () => {
         });
     });
 
-    it('has no whitelist for other cube types', () => {
-        expect(findInvalidMove("R U r' M Rw anything goes here", '4x4')).toBeNull();
+    describe('4x4', () => {
+        it('accepts everything 3x3 accepts', () => {
+            expect(findInvalidMove("R U R' U2 F D' x y' z2 r u f' l2 d b2' M E' S2", '4x4')).toBeNull();
+        });
+
+        it('accepts explicit wide turns on capital face letters', () => {
+            expect(findInvalidMove("Rw U2 Lw' Fw2'", '4x4')).toBeNull();
+        });
+
+        it('rejects a wide turn on a rotation', () => {
+            expect(findInvalidMove('xw U', '4x4')).toBe('xw');
+        });
+
+        it('rejects a wide turn on a slice move', () => {
+            expect(findInvalidMove('Mw U', '4x4')).toBe('Mw');
+        });
+
+        it('rejects a wide turn on a lowercase move', () => {
+            expect(findInvalidMove('rw U', '4x4')).toBe('rw');
+        });
+
+        it('rejects an apostrophe before the 2 on a wide turn', () => {
+            expect(findInvalidMove("Rw'2 U", '4x4')).toBe("Rw'2");
+        });
+
+        it('rejects a wide turn with a doubled modifier', () => {
+            expect(findInvalidMove('Rw22 U', '4x4')).toBe('Rw22');
+        });
+
+        it('rejects 3-layer-prefixed moves', () => {
+            expect(findInvalidMove('3R U', '4x4')).toBe('3R');
+        });
+
+        it('rejects two turns glued into a single component', () => {
+            expect(findInvalidMove('RL U', '4x4')).toBe('RL');
+        });
+    });
+
+    it('has no grammar for other cube types', () => {
+        expect(findInvalidMove("R U r' M Rw anything goes here", '5x5')).toBeNull();
     });
 });

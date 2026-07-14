@@ -109,6 +109,49 @@ describe('NormalCube', () => {
     });
 });
 
+describe('NormalCube 4x4 lowercase slice moves', () => {
+    // On a 4x4, lowercase face letters mean a slice-only turn (just the
+    // layer adjacent to that face, no face rotation) rather than the
+    // wide-turn meaning used on every other cube size - see
+    // NormalCube.getTurnFn().
+    it.each(['r', 'l', 'f', 'b', 'u', 'd'])('returns to the exact initial state after four %s turns', (letter) => {
+        const cube = new NormalCube(4);
+        cube.applyMoves(`${letter} ${letter} ${letter} ${letter}`);
+        expect(cube.equals(new NormalCube(4))).toBe(true);
+    });
+
+    it('a single lowercase slice move is not a no-op', () => {
+        const cube = new NormalCube(4);
+        cube.applyMoves('r');
+        expect(cube.equals(new NormalCube(4))).toBe(false);
+    });
+
+    // A wide turn is defined as the outer layer plus the adjacent inner
+    // layer moving together - i.e. exactly the face turn composed with its
+    // slice-only lowercase counterpart, since those two layers don't
+    // overlap and the face-only rotation piece doesn't interact with the
+    // inner slice's cells.
+    it.each(['R', 'L', 'F', 'B', 'U', 'D'])('%sw equals the outer turn composed with its slice turn', (letter) => {
+        const wide = new NormalCube(4);
+        wide.applyMoves(`${letter}w`);
+
+        const composed = new NormalCube(4);
+        composed.applyMoves(`${letter} ${letter.toLowerCase()}`);
+
+        expect(wide.equals(composed)).toBe(true);
+    });
+
+    it('a lowercase slice move is not the same as the equivalent wide turn', () => {
+        const sliceCube = new NormalCube(4);
+        sliceCube.applyMoves('r');
+
+        const wideCube = new NormalCube(4);
+        wideCube.applyMoves('Rw');
+
+        expect(sliceCube.equals(wideCube)).toBe(false);
+    });
+});
+
 describe('NormalCube rotations (x, y, z)', () => {
     // Rotations are whole-cube moves, so their effect can't be observed via
     // isSolved() alone once a face's own sticker pattern is at stake (a
