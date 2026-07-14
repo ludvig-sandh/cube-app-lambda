@@ -28,8 +28,15 @@ export function invertNotation(notation: string): string {
 // 2x2 has no inner layer to make wide turns distinct from face turns
 // anyway), and no slice moves (M E S - a 2x2 has no middle layer for them
 // to turn).
+//
+// 3x3: everything 2x2 allows, plus slice moves (M E S) and lowercase wide
+// face turns (r l f b u d) - a 3x3 has the extra layers for both. Still no
+// explicit Xw-style wide turns or 3-layer prefixes (3R): those aren't
+// single letter+modifier moves, so hasValidMoveShape() rejects them the
+// same way it rejects a two-turn component like "RL".
 const MOVE_LETTERS_BY_CUBE_TYPE: Record<string, ReadonlySet<string>> = {
     '2x2': new Set(['R', 'L', 'F', 'B', 'U', 'D', 'x', 'y', 'z']),
+    '3x3': new Set(['R', 'L', 'F', 'B', 'U', 'D', 'M', 'E', 'S', 'x', 'y', 'z', 'r', 'l', 'f', 'b', 'u', 'd']),
 };
 
 // A move is a letter followed by an optional modifier - order matters, not
