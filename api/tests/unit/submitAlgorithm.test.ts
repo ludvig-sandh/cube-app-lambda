@@ -138,6 +138,66 @@ describe('POST /algorithm-sets/{setId}/cases/{caseId}/algorithms', () => {
         expect(ddbMock.commandCalls(TransactWriteCommand)).toHaveLength(0);
     });
 
+    it('returns 422 when notation for a 2x2 set uses a lowercase (wide-style) face turn', async () => {
+        ddbMock
+            .on(GetCommand, { TableName: 'AlgorithmSets' })
+            .resolves({ Item: { setId: 'OLL', cubeType: '2x2', mask: OLL_MASK } });
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: "R U r'" }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: '"r\'" is not a valid move for a 2x2 cube.',
+        });
+        expect(ddbMock.commandCalls(TransactWriteCommand)).toHaveLength(0);
+    });
+
+    it('returns 422 when notation for a 2x2 set uses a slice move', async () => {
+        ddbMock
+            .on(GetCommand, { TableName: 'AlgorithmSets' })
+            .resolves({ Item: { setId: 'OLL', cubeType: '2x2', mask: OLL_MASK } });
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: 'R U M' }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: '"M" is not a valid move for a 2x2 cube.',
+        });
+    });
+
+    it('returns 422 when notation for a 2x2 set uses an explicit wide turn', async () => {
+        ddbMock
+            .on(GetCommand, { TableName: 'AlgorithmSets' })
+            .resolves({ Item: { setId: 'OLL', cubeType: '2x2', mask: OLL_MASK } });
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: 'Rw U' }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: '"Rw" is not a valid move for a 2x2 cube.',
+        });
+    });
+
+    it('allows capital-letter face turns and cube rotations for a 2x2 set', async () => {
+        ddbMock
+            .on(GetCommand, { TableName: 'AlgorithmSets' })
+            .resolves({ Item: { setId: 'OLL', cubeType: '2x2', mask: OLL_MASK } });
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: "R U x y'" }) });
+        const result = await lambdaHandler(event);
+
+        // Doesn't solve the (3x3-shaped) mocked case, so it fails at the
+        // solve check rather than the move-notation check - proves valid
+        // 2x2 moves pass through the whitelist.
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: 'Sequence does not solve this case.',
+        });
+    });
+
     it('returns 404 when the algorithm set does not exist', async () => {
         ddbMock.on(GetCommand, { TableName: 'AlgorithmSets' }).resolves({ Item: undefined });
         const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: SUNE }) });

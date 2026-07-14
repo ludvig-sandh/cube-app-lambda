@@ -1,4 +1,4 @@
-import { normalizeNotation, invertNotation } from '../../../cube/notation';
+import { normalizeNotation, invertNotation, findInvalidMove } from '../../../cube/notation';
 import { expect, describe, it } from '@jest/globals';
 
 describe('normalizeNotation', () => {
@@ -67,5 +67,54 @@ describe('invertNotation', () => {
     it('round-trips: inverting twice returns the normalized original', () => {
         const original = "R U R' U R U2 R'";
         expect(invertNotation(invertNotation(original))).toBe(normalizeNotation(original));
+    });
+});
+
+describe('findInvalidMove', () => {
+    describe('2x2', () => {
+        it('accepts capital-letter face turns with no modifier, prime, or double', () => {
+            expect(findInvalidMove("R U R' U2 F D'", '2x2')).toBeNull();
+        });
+
+        it('accepts whole-cube rotations', () => {
+            expect(findInvalidMove("x y' z2", '2x2')).toBeNull();
+        });
+
+        it('rejects lowercase wide-style face turns', () => {
+            expect(findInvalidMove("R U r'", '2x2')).toBe("r'");
+        });
+
+        it('rejects explicit Xw-style wide turns', () => {
+            expect(findInvalidMove('Rw U', '2x2')).toBe('Rw');
+        });
+
+        it('rejects slice moves', () => {
+            expect(findInvalidMove('M U E', '2x2')).toBe('M');
+        });
+
+        it('rejects 3-layer-prefixed moves', () => {
+            expect(findInvalidMove('3R U', '2x2')).toBe('3R');
+        });
+
+        it('accepts a double turn with a trailing apostrophe (finger-trick hint)', () => {
+            expect(findInvalidMove("R2' U", '2x2')).toBeNull();
+        });
+
+        it('rejects an apostrophe before the 2 (wrong modifier order)', () => {
+            expect(findInvalidMove("R'2 U", '2x2')).toBe("R'2");
+        });
+
+        it('rejects a doubled modifier', () => {
+            expect(findInvalidMove("R'' U", '2x2')).toBe("R''");
+            expect(findInvalidMove('R22 U', '2x2')).toBe('R22');
+        });
+
+        it('rejects a modifier with no letter', () => {
+            expect(findInvalidMove("' U", '2x2')).toBe("'");
+        });
+    });
+
+    it('has no whitelist for other cube types (e.g. 3x3 keeps supporting lowercase/slices/wide)', () => {
+        expect(findInvalidMove("R U r' M Rw", '3x3')).toBeNull();
     });
 });

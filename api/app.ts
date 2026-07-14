@@ -3,7 +3,7 @@ import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dyn
 import { randomUUID } from 'crypto';
 import { docClient } from './db';
 import { NormalCube } from './cube/NormalCube';
-import { normalizeNotation } from './cube/notation';
+import { normalizeNotation, findInvalidMove } from './cube/notation';
 
 /**
  *
@@ -262,6 +262,11 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
 
     const { cubeType, mask } = algorithmSet.Item as { cubeType: string; mask: string };
     const { scramble } = caseItem.Item as { scramble: string };
+
+    const invalidMove = findInvalidMove(normalizedProposal, cubeType);
+    if (invalidMove) {
+        return errorResponse(422, 'invalid_algorithm', `"${invalidMove}" is not a valid move for a ${cubeType} cube.`);
+    }
 
     const cube = new NormalCube(cubeSizeForType(cubeType));
     cube.applyIgnoreMask(mask);
