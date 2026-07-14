@@ -1,0 +1,31 @@
+{
+  "cubeType": "3x3",
+  "mask": "############\n############\n############\n############\n############\n############\n############\n############\n############",
+  "algorithms": [
+        "r U R' U' r' U2 R U R U' R2 U2 R",
+        "y' M' U' M U M' U M U M' U M U2 M' U' M",
+        "M' U M' U M' U M' U2 M' U M' U M' U M'",
+        "M U R U R' U' M2 U R U' r'",
+        "M' U M' U M' U M' U' M' U M' U M' U M'",
+        "M' U M U M' U2 M' U M' U M U M' U M'",
+        "M' U' M' U2 M' U M U' M' U2 M U M2",
+        "M' U M' U2 M' U' M U M' U2 M U' M2",
+        "y M' U' M' U2 M U' M2 U' M'",
+        "U R' U' R F D R2 D' R' F' U R2 U2 R'",
+        "r' U M2 U' r U2 r' U M2 U' r",
+        "y' M' U M' U2 M U M2 U M'",
+        "M2 U' M' U2 M U M' U' M U2 M U M",
+        "R U2 R' U2 R' F R U R U' R2 F' R U R U' R'",
+        "F R U R' U' F' R' U' R' F R F' U R",
+        "y' R U R' U' M' U R U' r'",
+        "M' U M U' M' U M U M' U2 M",
+        "M' U' M U' M' U' M U' M' U' M",
+        "y L' U' L U M' U' L' U l",
+        "y' F R U R' U' F2 L' U' L U F",
+        "y' r' U' R U M' U' R' U R",
+        "y M' U' M U M' U' M U' M' U2 M",
+        "y2 M' U M U2 M' U M",
+        "M U' M' U2 M U' M'",
+        "y' r U R' U' M U R U' R'"
+  ]
+}
