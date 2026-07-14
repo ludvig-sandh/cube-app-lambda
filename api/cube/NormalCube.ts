@@ -1,9 +1,6 @@
 // Ported from the Swift `NormalCube` in the iOS app.
-// Supports Singmaster notation, explicit wide turns (Rw etc), slice moves
-// (M E S), and rotations (x y z). Lowercase face letters (r u f l d b) mean
-// a wide turn (face + adjacent inner layer) on a 3x3, but on a 4x4 or
-// larger they instead mean a slice-only turn of just the layer adjacent to
-// that face, with no face rotation - see getTurnFn().
+// Supports Singmaster notation, lowercase wide moves (r u f l d b), slice
+// moves (M E S - odd-size cubes only), and rotations (x y z).
 
 type Side = 'top' | 'left' | 'front' | 'right' | 'back' | 'bottom' | 'none';
 
@@ -156,29 +153,6 @@ export class NormalCube {
 
     // Returns the corresponding method to call to rotate the side for the given letter
     private getTurnFn(letter: string): (numLayersToTurn: number) => void {
-        // On a 4x4 or larger, lowercase face letters are slice-only turns
-        // (just the layer adjacent to that face, no face rotation) rather
-        // than the wide-turn meaning a 3x3 uses - see the file header
-        // comment.
-        if (this.size >= 4) {
-            switch (letter) {
-                case 'r':
-                    return () => this.RSlice(1);
-                case 'l':
-                    return () => this.LSlice(1);
-                case 'f':
-                    return () => this.FSlice(1);
-                case 'b':
-                    return () => this.BSlice(1);
-                case 'u':
-                    return () => this.USlice(1);
-                case 'd':
-                    return () => this.DSlice(1);
-                default:
-                    break;
-            }
-        }
-
         switch (letter) {
             case 'R':
             case 'r':
@@ -240,24 +214,18 @@ export class NormalCube {
     }
 
     private R(numLayersToTurn: number): void {
-        for (let layer = 0; layer < numLayersToTurn; layer++) {
-            this.RSlice(layer);
-        }
-
-        this.rotateSide(this.size * 2, this.size, this.size);
-    }
-
-    // One depth of R()'s cycle, without R's own face rotation - reused by
-    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
-    private RSlice(layer: number): void {
         const { size, grid } = this;
-        for (let i = 0; i < size; i++) {
-            const temp = grid[size * 2 - 1 - layer][i];
-            grid[size * 2 - 1 - layer][i] = grid[size * 2 - 1 - layer][size + i];
-            grid[size * 2 - 1 - layer][size + i] = grid[size * 2 - 1 - layer][size * 2 + i];
-            grid[size * 2 - 1 - layer][size * 2 + i] = grid[size * 3 + layer][size * 2 - 1 - i];
-            grid[size * 3 + layer][size * 2 - 1 - i] = temp;
+        for (let layer = 0; layer < numLayersToTurn; layer++) {
+            for (let i = 0; i < size; i++) {
+                const temp = grid[size * 2 - 1 - layer][i];
+                grid[size * 2 - 1 - layer][i] = grid[size * 2 - 1 - layer][size + i];
+                grid[size * 2 - 1 - layer][size + i] = grid[size * 2 - 1 - layer][size * 2 + i];
+                grid[size * 2 - 1 - layer][size * 2 + i] = grid[size * 3 + layer][size * 2 - 1 - i];
+                grid[size * 3 + layer][size * 2 - 1 - i] = temp;
+            }
         }
+
+        this.rotateSide(size * 2, size, size);
     }
 
     private L(numLayersToTurn: number): void {
@@ -301,45 +269,33 @@ export class NormalCube {
     }
 
     private B(numLayersToTurn: number): void {
-        for (let layer = 0; layer < numLayersToTurn; layer++) {
-            this.BSlice(layer);
-        }
-
-        this.rotateSide(this.size * 3, this.size, this.size);
-    }
-
-    // One depth of B()'s cycle, without B's own face rotation - reused by
-    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
-    private BSlice(layer: number): void {
         const { size, grid } = this;
-        for (let i = 0; i < size; i++) {
-            const temp = grid[size + i][layer];
-            grid[size + i][layer] = grid[size * 3 - 1 - layer][size + i];
-            grid[size * 3 - 1 - layer][size + i] = grid[size * 2 - 1 - i][size * 3 - 1 - layer];
-            grid[size * 2 - 1 - i][size * 3 - 1 - layer] = grid[layer][size * 2 - 1 - i];
-            grid[layer][size * 2 - 1 - i] = temp;
+        for (let layer = 0; layer < numLayersToTurn; layer++) {
+            for (let i = 0; i < size; i++) {
+                const temp = grid[size + i][layer];
+                grid[size + i][layer] = grid[size * 3 - 1 - layer][size + i];
+                grid[size * 3 - 1 - layer][size + i] = grid[size * 2 - 1 - i][size * 3 - 1 - layer];
+                grid[size * 2 - 1 - i][size * 3 - 1 - layer] = grid[layer][size * 2 - 1 - i];
+                grid[layer][size * 2 - 1 - i] = temp;
+            }
         }
+
+        this.rotateSide(size * 3, size, size);
     }
 
     private U(numLayersToTurn: number): void {
-        for (let layer = 0; layer < numLayersToTurn; layer++) {
-            this.USlice(layer);
-        }
-
-        this.rotateSide(this.size, 0, this.size);
-    }
-
-    // One depth of U()'s cycle, without U's own face rotation - reused by
-    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
-    private USlice(layer: number): void {
         const { size, grid } = this;
-        for (let i = 0; i < size; i++) {
-            const temp = grid[size + i][size + layer];
-            grid[size + i][size + layer] = grid[size * 2 + i][size + layer];
-            grid[size * 2 + i][size + layer] = grid[size * 3 + i][size + layer];
-            grid[size * 3 + i][size + layer] = grid[i][size + layer];
-            grid[i][size + layer] = temp;
+        for (let layer = 0; layer < numLayersToTurn; layer++) {
+            for (let i = 0; i < size; i++) {
+                const temp = grid[size + i][size + layer];
+                grid[size + i][size + layer] = grid[size * 2 + i][size + layer];
+                grid[size * 2 + i][size + layer] = grid[size * 3 + i][size + layer];
+                grid[size * 3 + i][size + layer] = grid[i][size + layer];
+                grid[i][size + layer] = temp;
+            }
         }
+
+        this.rotateSide(size, 0, size);
     }
 
     private D(numLayersToTurn: number): void {

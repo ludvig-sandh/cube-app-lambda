@@ -24,14 +24,6 @@ const OLL_MASK = (() => {
     return rows.join('\n');
 })();
 
-// A full "match everything" mask, sized for a 4x4 grid - just enough for
-// applyIgnoreMask() not to index out of bounds; the 4x4 tests below only
-// care about notation validation, not the (irrelevant) solve outcome.
-const FULL_4X4_MASK = Array.from({ length: 12 }, () => '#'.repeat(16)).join('\n'); // size(4) * 3 rows, size(4) * 4 cols
-
-// Same idea as FULL_4X4_MASK, sized for a 5x5 grid.
-const FULL_5X5_MASK = Array.from({ length: 15 }, () => '#'.repeat(20)).join('\n'); // size(5) * 3 rows, size(5) * 4 cols
-
 const SUNE = "R U R' U R U2 R'";
 const SUNE_INVERSE = "R U2 R' U' R U' R'";
 const SET_ID_CASE_ID = 'OLL#1';
@@ -199,72 +191,6 @@ describe('POST /algorithm-sets/{setId}/cases/{caseId}/algorithms', () => {
         // Doesn't solve the (3x3-shaped) mocked case, so it fails at the
         // solve check rather than the move-notation check - proves valid
         // 2x2 moves pass through the whitelist.
-        expect(result.statusCode).toEqual(422);
-        expect(JSON.parse(result.body)).toEqual({
-            error: 'invalid_algorithm',
-            message: 'Sequence does not solve this case.',
-        });
-    });
-
-    it('returns 422 when notation for a 4x4 set uses a wide turn on a rotation', async () => {
-        ddbMock
-            .on(GetCommand, { TableName: 'AlgorithmSets' })
-            .resolves({ Item: { setId: 'OLL', cubeType: '4x4', mask: FULL_4X4_MASK } });
-        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: 'xw U' }) });
-        const result = await lambdaHandler(event);
-
-        expect(result.statusCode).toEqual(422);
-        expect(JSON.parse(result.body)).toEqual({
-            error: 'invalid_algorithm',
-            message: '"xw" is not a valid move for a 4x4 cube.',
-        });
-    });
-
-    it('allows capital-letter wide turns, lowercase slice turns, and MES slices for a 4x4 set', async () => {
-        ddbMock
-            .on(GetCommand, { TableName: 'AlgorithmSets' })
-            .resolves({ Item: { setId: 'OLL', cubeType: '4x4', mask: FULL_4X4_MASK } });
-        const event = buildEvent({
-            body: JSON.stringify({ installationId: 'install-1', notation: "Rw U r' M" }),
-        });
-        const result = await lambdaHandler(event);
-
-        // Doesn't solve the (3x3-shaped) mocked case, so it fails at the
-        // solve check rather than the move-notation check - proves valid
-        // 4x4 moves pass through the grammar.
-        expect(result.statusCode).toEqual(422);
-        expect(JSON.parse(result.body)).toEqual({
-            error: 'invalid_algorithm',
-            message: 'Sequence does not solve this case.',
-        });
-    });
-
-    it('returns 422 when notation for a 5x5 set uses a wide turn on a slice move', async () => {
-        ddbMock
-            .on(GetCommand, { TableName: 'AlgorithmSets' })
-            .resolves({ Item: { setId: 'OLL', cubeType: '5x5', mask: FULL_5X5_MASK } });
-        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: 'Mw U' }) });
-        const result = await lambdaHandler(event);
-
-        expect(result.statusCode).toEqual(422);
-        expect(JSON.parse(result.body)).toEqual({
-            error: 'invalid_algorithm',
-            message: '"Mw" is not a valid move for a 5x5 cube.',
-        });
-    });
-
-    it('allows capital-letter wide turns, lowercase slice turns, and MES slices for a 5x5 set', async () => {
-        ddbMock
-            .on(GetCommand, { TableName: 'AlgorithmSets' })
-            .resolves({ Item: { setId: 'OLL', cubeType: '5x5', mask: FULL_5X5_MASK } });
-        const event = buildEvent({
-            body: JSON.stringify({ installationId: 'install-1', notation: "Rw U r' M" }),
-        });
-        const result = await lambdaHandler(event);
-
-        // Doesn't solve the (3x3-shaped) mocked case, so it fails at the
-        // solve check rather than the move-notation check - proves valid
-        // 5x5 moves pass through the grammar.
         expect(result.statusCode).toEqual(422);
         expect(JSON.parse(result.body)).toEqual({
             error: 'invalid_algorithm',
