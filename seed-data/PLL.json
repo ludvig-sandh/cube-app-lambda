@@ -5,7 +5,7 @@
         "M2 U' M U2 M' U' M2",
         "M2 U M U2 M' U M2",
         "M2 U M2 U2 M2 U M2",
-        "M2 U M2 U M' U2 M2 U2 M'",
+        "U M2 U M2 U M' U2 M2 U2 M'",
         "x R' U R' D2 R U' R' D2 R2 x'",
         "x' R U' R D2 R' U R D2 R2 x",
         "U (R' U' F') (R U R' U' R' F R2 U' R' U' R U R') U R",

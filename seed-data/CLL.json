@@ -23,7 +23,7 @@
         "F R U R' U' F'",
         "R2 F2 R U R' F R2 U2 R' U' R",
         "R U2 R U' R' F R' F2 U' F",
-        "(U) x R U' R U' R' U L' U' L",
+        "(U) x R U' R U' R' U L' U' L z2",
         "(U) R U' R2 F R F' R U R' U' R U R'",
         "(U) R' U R' F R F' R U2 R' U R",
         "(U) F' R U R' U' R' F R",
@@ -39,7 +39,7 @@
         "(U') F R F' R U R' U R' U' R U' R'",
         "(U) R' U R U2 R2 F R F' R",
         "R2 U2 R U2' R2'",
-        "x' U2 R U2 R2 F2 R U2",
+        "x' U2 R U2 R2 F2 R U2 x",
         " R U R' U R U R' F R' F' R",
         "(U) F R2 U' R2' U' R2 U R2' F'"
   ]
