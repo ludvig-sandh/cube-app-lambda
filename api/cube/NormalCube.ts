@@ -1,8 +1,8 @@
 // Ported from the Swift `NormalCube` in the iOS app.
 // Supports Singmaster notation, explicit wide turns (Rw etc), slice moves
 // (M E S), and rotations (x y z). Lowercase face letters (r u f l d b) mean
-// a wide turn (face + adjacent inner layer) on every cube size except 4x4,
-// where they instead mean a slice-only turn of just the layer adjacent to
+// a wide turn (face + adjacent inner layer) on a 3x3, but on a 4x4 or
+// larger they instead mean a slice-only turn of just the layer adjacent to
 // that face, with no face rotation - see getTurnFn().
 
 type Side = 'top' | 'left' | 'front' | 'right' | 'back' | 'bottom' | 'none';
@@ -156,11 +156,11 @@ export class NormalCube {
 
     // Returns the corresponding method to call to rotate the side for the given letter
     private getTurnFn(letter: string): (numLayersToTurn: number) => void {
-        // On a 4x4, lowercase face letters are slice-only turns (just the
-        // layer adjacent to that face, no face rotation) rather than the
-        // wide-turn meaning every other cube size uses - see the file
-        // header comment.
-        if (this.size === 4) {
+        // On a 4x4 or larger, lowercase face letters are slice-only turns
+        // (just the layer adjacent to that face, no face rotation) rather
+        // than the wide-turn meaning a 3x3 uses - see the file header
+        // comment.
+        if (this.size >= 4) {
             switch (letter) {
                 case 'r':
                     return () => this.RSlice(1);
@@ -248,7 +248,7 @@ export class NormalCube {
     }
 
     // One depth of R()'s cycle, without R's own face rotation - reused by
-    // the 4x4-only inner-slice lowercase moves (see getTurnFn()).
+    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
     private RSlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {
@@ -309,7 +309,7 @@ export class NormalCube {
     }
 
     // One depth of B()'s cycle, without B's own face rotation - reused by
-    // the 4x4-only inner-slice lowercase moves (see getTurnFn()).
+    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
     private BSlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {
@@ -330,7 +330,7 @@ export class NormalCube {
     }
 
     // One depth of U()'s cycle, without U's own face rotation - reused by
-    // the 4x4-only inner-slice lowercase moves (see getTurnFn()).
+    // the 4x4+ inner-slice lowercase moves (see getTurnFn()).
     private USlice(layer: number): void {
         const { size, grid } = this;
         for (let i = 0; i < size; i++) {

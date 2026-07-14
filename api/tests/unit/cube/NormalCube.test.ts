@@ -109,21 +109,20 @@ describe('NormalCube', () => {
     });
 });
 
-describe('NormalCube 4x4 lowercase slice moves', () => {
-    // On a 4x4, lowercase face letters mean a slice-only turn (just the
-    // layer adjacent to that face, no face rotation) rather than the
-    // wide-turn meaning used on every other cube size - see
-    // NormalCube.getTurnFn().
+describe.each([4, 5])('NormalCube %ix%i lowercase slice moves', (size) => {
+    // On a 4x4 or larger, lowercase face letters mean a slice-only turn
+    // (just the layer adjacent to that face, no face rotation) rather than
+    // the wide-turn meaning a 3x3 uses - see NormalCube.getTurnFn().
     it.each(['r', 'l', 'f', 'b', 'u', 'd'])('returns to the exact initial state after four %s turns', (letter) => {
-        const cube = new NormalCube(4);
+        const cube = new NormalCube(size);
         cube.applyMoves(`${letter} ${letter} ${letter} ${letter}`);
-        expect(cube.equals(new NormalCube(4))).toBe(true);
+        expect(cube.equals(new NormalCube(size))).toBe(true);
     });
 
     it('a single lowercase slice move is not a no-op', () => {
-        const cube = new NormalCube(4);
+        const cube = new NormalCube(size);
         cube.applyMoves('r');
-        expect(cube.equals(new NormalCube(4))).toBe(false);
+        expect(cube.equals(new NormalCube(size))).toBe(false);
     });
 
     // A wide turn is defined as the outer layer plus the adjacent inner
@@ -132,23 +131,46 @@ describe('NormalCube 4x4 lowercase slice moves', () => {
     // overlap and the face-only rotation piece doesn't interact with the
     // inner slice's cells.
     it.each(['R', 'L', 'F', 'B', 'U', 'D'])('%sw equals the outer turn composed with its slice turn', (letter) => {
-        const wide = new NormalCube(4);
+        const wide = new NormalCube(size);
         wide.applyMoves(`${letter}w`);
 
-        const composed = new NormalCube(4);
+        const composed = new NormalCube(size);
         composed.applyMoves(`${letter} ${letter.toLowerCase()}`);
 
         expect(wide.equals(composed)).toBe(true);
     });
 
     it('a lowercase slice move is not the same as the equivalent wide turn', () => {
-        const sliceCube = new NormalCube(4);
+        const sliceCube = new NormalCube(size);
         sliceCube.applyMoves('r');
 
-        const wideCube = new NormalCube(4);
+        const wideCube = new NormalCube(size);
         wideCube.applyMoves('Rw');
 
         expect(sliceCube.equals(wideCube)).toBe(false);
+    });
+});
+
+describe('NormalCube 5x5 M E S slices', () => {
+    // A 5x5 has a genuine single center layer (unlike a 4x4, where
+    // Math.floor(size / 2) happens to land on the same layer as one side's
+    // lowercase slice) - M E S should be a distinct move from every
+    // lowercase slice move, not an alias for one of them.
+    it.each([
+        ['M', 'r'],
+        ['M', 'l'],
+        ['E', 'u'],
+        ['E', 'd'],
+        ['S', 'f'],
+        ['S', 'b'],
+    ])('%s is not the same move as %s', (sliceLetter, lowercaseLetter) => {
+        const sliceCube = new NormalCube(5);
+        sliceCube.applyMoves(sliceLetter);
+
+        const lowercaseCube = new NormalCube(5);
+        lowercaseCube.applyMoves(lowercaseLetter);
+
+        expect(sliceCube.equals(lowercaseCube)).toBe(false);
     });
 });
 

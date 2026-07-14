@@ -73,10 +73,17 @@ const WIDE_CAPABLE_FACE_LETTERS = new Set(['R', 'L', 'F', 'B', 'U', 'D']);
 // rotation) rather than a wide turn - see NormalCube.getTurnFn(). That's a
 // cube-simulation distinction, not a notation-shape one, so it doesn't
 // change this grammar.
+//
+// 5x5: the same notation shape as 4x4 (same letters, same wide-turn
+// eligibility) - a 5x5 has a genuine single center layer, so M E S keep
+// meaning exactly that innermost layer (NormalCube.M/E/S already use
+// Math.floor(size / 2), which lands on it), rather than needing a grammar
+// change here.
 const MOVE_GRAMMAR_BY_CUBE_TYPE: Record<string, CubeMoveGrammar> = {
     '2x2': { letters: new Set(['R', 'L', 'F', 'B', 'U', 'D', 'x', 'y', 'z']) },
     '3x3': { letters: FACE_SLICE_AND_ROTATION_LETTERS },
     '4x4': { letters: FACE_SLICE_AND_ROTATION_LETTERS, wideLetters: WIDE_CAPABLE_FACE_LETTERS },
+    '5x5': { letters: FACE_SLICE_AND_ROTATION_LETTERS, wideLetters: WIDE_CAPABLE_FACE_LETTERS },
 };
 
 // A move is a letter, an optional 'w' (wide turn), then an optional

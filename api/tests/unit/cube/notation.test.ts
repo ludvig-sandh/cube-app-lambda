@@ -191,7 +191,33 @@ describe('findInvalidMove', () => {
         });
     });
 
+    describe('5x5', () => {
+        it('accepts everything 4x4 accepts', () => {
+            expect(findInvalidMove("R U R' U2 F D' x y' z2 r u f' l2 d b2' M E' S2 Rw U2 Lw' Fw2'", '5x5')).toBeNull();
+        });
+
+        it('rejects a wide turn on a rotation', () => {
+            expect(findInvalidMove('xw U', '5x5')).toBe('xw');
+        });
+
+        it('rejects a wide turn on a slice move', () => {
+            expect(findInvalidMove('Mw U', '5x5')).toBe('Mw');
+        });
+
+        it('rejects a wide turn on a lowercase move', () => {
+            expect(findInvalidMove('rw U', '5x5')).toBe('rw');
+        });
+
+        it('rejects 3-layer-prefixed moves', () => {
+            expect(findInvalidMove('3R U', '5x5')).toBe('3R');
+        });
+
+        it('rejects two turns glued into a single component', () => {
+            expect(findInvalidMove('RL U', '5x5')).toBe('RL');
+        });
+    });
+
     it('has no grammar for other cube types', () => {
-        expect(findInvalidMove("R U r' M Rw anything goes here", '5x5')).toBeNull();
+        expect(findInvalidMove("R U r' M Rw anything goes here", '6x6')).toBeNull();
     });
 });
