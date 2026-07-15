@@ -20,6 +20,12 @@ Globals:
         HttpMethod: '*'
         ThrottlingRateLimit: 20
         ThrottlingBurstLimit: 40
+    # Requires x-api-key on every request - a shared secret baked into the
+    # app build, not per-user auth. Filters out casual/scripted abuse. The
+    # actual key value is AWS-generated at deploy time (see ApiKey resource
+    # below) and never set literally here, since this file is public.
+    Auth:
+      ApiKeyRequired: true
 
 Parameters:
   # Table names are Parameters (not just literal strings inline on each
@@ -201,6 +207,36 @@ Resources:
         - AttributeName: setIdCaseId
           KeyType: RANGE
 
+  # Shared secret required by every route (see Globals.Api.Auth above). No
+  # Value is set here - API Gateway generates one at deploy time, since this
+  # file is committed to a public repo. Fetch the actual value afterward
+  # with `aws apigateway get-api-key --api-key <ApiKeyId output> --include-value`
+  # and bake it into the app's build config; never write it into this repo.
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn:
+      - ServerlessRestApiProdStage
+    Properties:
+      Name: cube-app-api-key
+      Enabled: true
+
+  ApiUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn:
+      - ServerlessRestApiProdStage
+    Properties:
+      UsagePlanName: cube-app-usage-plan
+      ApiStages:
+        - ApiId: !Ref ServerlessRestApi
+          Stage: Prod
+
+  ApiUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref ApiUsagePlan
+
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
@@ -214,3 +250,8 @@ Outputs:
   ApiFunctionIamRole:
     Description: "Implicit IAM Role created for the function"
     Value: !GetAtt ApiFunctionRole.Arn
+  ApiKeyId:
+    Description: >
+      API Key ID (not the secret value). Fetch the actual value with:
+      aws apigateway get-api-key --api-key <this value> --include-value --query value --output text
+    Value: !Ref ApiKey

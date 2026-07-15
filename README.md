@@ -114,6 +114,11 @@ curl -X POST http://localhost:3000/algorithm-sets/OLL/cases/1/algorithms \
   -d '{"installationId": "test", "notation": "R U R'"'"' U R U2 R'"'"'"}'
 ```
 
+Note: the API requires an `x-api-key` header once deployed (see below), but
+`sam local start-api` doesn't enforce that - it's a real API Gateway
+feature, not something the local emulator reproduces - so no key is needed
+for local requests like the one above.
+
 Run unit tests:
 
 ```bash
@@ -130,6 +135,25 @@ sam deploy --guided
 ```
 
 `--guided` walks you through stack name, region, and confirmation prompts, then saves your choices to `samconfig.toml` so future deploys can just be `sam deploy`.
+
+### API key
+
+Every route requires an `x-api-key` header (see `Globals.Api.Auth` in
+`template.yaml`) - a shared secret baked into the app build, meant to block
+casual/scripted abuse rather than authenticate individual users. API
+Gateway generates the actual key value at deploy time; it's never written
+into `template.yaml` or anywhere else in this repo, since the repo is
+public. After deploying, fetch it once with:
+
+```bash
+aws apigateway get-api-key \
+  --api-key "$(aws cloudformation describe-stacks --stack-name cube-app-lambda \
+      --query "Stacks[0].Outputs[?OutputKey=='ApiKeyId'].OutputValue" --output text)" \
+  --include-value --query value --output text
+```
+
+Store that value only in the mobile app's build config (outside this
+repo) and send it as `x-api-key` on every request.
 
 ## Next steps
 
