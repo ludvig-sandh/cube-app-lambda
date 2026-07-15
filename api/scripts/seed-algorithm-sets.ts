@@ -7,8 +7,9 @@
 // is taken from the file name (e.g. seed-data/OLL.json -> setId "OLL").
 //
 // Usage: npm run seed
-// Env vars: DYNAMODB_ENDPOINT (default http://localhost:8000), AWS_REGION
-// (default us-east-1).
+// Env vars: DYNAMODB_ENDPOINT (unset -> talks to real AWS DynamoDB using
+// your AWS CLI credentials; set to http://localhost:8000 for local dev
+// against DynamoDB Local), AWS_REGION (default us-east-1).
 
 import { readdirSync, readFileSync } from 'fs';
 import { basename, join } from 'path';
@@ -29,14 +30,17 @@ function readSeedData(filePath: string): AlgorithmSetSeedData {
 }
 
 function buildDynamoClient(): DynamoDBDocumentClient {
-    const endpoint = process.env.DYNAMODB_ENDPOINT ?? 'http://localhost:8000';
-    const isLocal = endpoint.includes('localhost') || endpoint.includes('127.0.0.1');
+    const endpoint = process.env.DYNAMODB_ENDPOINT;
     const client = new DynamoDBClient({
-        endpoint,
         region: process.env.AWS_REGION ?? 'us-east-1',
-        // DynamoDB Local ignores these entirely, but the SDK still requires
-        // *something* to be set before it will issue a request.
-        ...(isLocal ? { credentials: { accessKeyId: 'local', secretAccessKey: 'local' } } : {}),
+        ...(endpoint
+            ? {
+                  endpoint,
+                  // DynamoDB Local ignores these entirely, but the SDK still
+                  // requires *something* to be set before it will issue a request.
+                  credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+              }
+            : {}),
     });
     return DynamoDBDocumentClient.from(client);
 }

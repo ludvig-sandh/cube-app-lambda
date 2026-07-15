@@ -69,7 +69,16 @@ set doesn't care about (e.g. OLL wildcards the last layer's side stickers,
 one line per grid row, `.` for don't-care). `algorithms` is one *solving*
 algorithm per case, in case order.
 
-Then run (with `docker compose up -d` running):
+Then run against DynamoDB Local (with `docker compose up -d` running):
+
+```bash
+cd api && DYNAMODB_ENDPOINT=http://localhost:8000 npm run seed
+```
+
+Without `DYNAMODB_ENDPOINT` set, the script talks to real AWS DynamoDB
+instead, using whatever AWS credentials are active in your shell (e.g.
+`cube-app-deployer` via `aws configure`) - useful for seeding a deployed
+stack's tables:
 
 ```bash
 cd api && npm run seed
