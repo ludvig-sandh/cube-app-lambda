@@ -63,8 +63,12 @@ Resources:
       Architectures:
         - arm64
       # Hard cap on simultaneous invocations, so cost is bounded regardless
-      # of how much traffic (legitimate or abusive) hits the API.
-      ReservedConcurrentExecutions: 20
+      # of how much traffic (legitimate or abusive) hits the API. Commented
+      # out for now - this account's Lambda concurrency quota is currently
+      # only 10 (a reduced new-account default), and AWS requires at least
+      # 10 to stay unreserved, so no positive reservation fits until that
+      # quota is raised via a Service Quotas request. Re-add once increased.
+      # ReservedConcurrentExecutions: 20
       Environment:
         Variables:
           ALGORITHM_SETS_TABLE_NAME: !Ref AlgorithmSetsTableName
