@@ -5,8 +5,10 @@ version = 0.1
 [default.global.parameters]
 stack_name = "cube-app-lambda"
 
+# cached=true was removed here deliberately - it once served a stale
+# pre-fix bundle to a real deploy despite reporting success. Full rebuilds
+# only from here on.
 [default.build.parameters]
-cached = true
 parallel = true
 
 [default.validate.parameters]

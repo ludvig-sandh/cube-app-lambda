@@ -88,6 +88,23 @@ This seeds every `seed-data/*.json` file in one pass.
 Safe to re-run - overwrites rather than duplicating. Adding a new set is
 just dropping in another `seed-data/<SETID>.json` file.
 
+### Resetting votes & submissions
+
+To wipe all user-generated data (every submitted algorithm and every vote)
+and restore each case to its single seeded default at 0 votes - e.g. after
+a bug produced bad data - run:
+
+```bash
+cd api && DYNAMODB_ENDPOINT=http://localhost:8000 npm run reset   # local
+cd api && npm run reset                                           # real AWS
+```
+
+This deletes every item in the `Algorithms` and `Votes` tables (leaving
+`AlgorithmSets`/`Cases` untouched, since those are set/case metadata, not
+user data), then re-runs `npm run seed` automatically. **Irreversible** -
+double-check `DYNAMODB_ENDPOINT`/AWS credentials before running this
+against the real deployed tables.
+
 Install dependencies:
 
 ```bash

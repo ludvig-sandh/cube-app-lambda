@@ -10,6 +10,7 @@
     "compile": "tsc",
     "test": "npm run compile && npm run unit",
     "seed": "ts-node scripts/seed-algorithm-sets.ts",
+    "reset": "ts-node scripts/reset-algorithms-and-votes.ts",
     "check-orientation": "ts-node scripts/check-case-orientation.ts"
   },
   "dependencies": {
