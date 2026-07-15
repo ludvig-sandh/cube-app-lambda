@@ -141,6 +141,14 @@ for now; revisit only if it actually becomes a problem.
 validator (§4.3) must support all of these when simulating a proposed
 algorithm.
 
+**Parentheses**: submitters may wrap moves in `( )` purely as a visual
+grouping/memory aid (e.g. `(R U R' U') (F R F')`) — they don't change which
+moves get applied. They're preserved in the stored/returned notation (see
+§4.3), but must be well-formed: balanced, a single level deep (no nesting),
+and never glued directly to a move with no separating boundary. Malformed
+parentheses are rejected at submission time — see §4.3/§5 for the exact
+error messages.
+
 ---
 
 ### 4.1 `GET /algorithm-sets/{setId}/top-algorithms`
@@ -191,22 +199,41 @@ Submit a new algorithm proposal for a case.
 ```
 
 **Behavior**
-1. **Normalize** the notation string (trim leading/trailing whitespace,
-   collapse internal whitespace runs to a single space). Notation stays
+1. **Reject oversized input**: if `notation` is longer than 200 characters,
+   reject with `400 Bad Request` before doing anything else (no DB reads, no
+   parsing) — see §5 for the exact message.
+2. **Clean** the notation string (trim leading/trailing whitespace, collapse
+   internal whitespace runs to a single space). Notation stays
    case-sensitive — lowercase letters are meaningful wide-move notation, not
-   noise to clean up.
-2. **Reject duplicates**: check the normalized string against the other
-   algorithms already stored for this case. If one matches exactly, reject
-   with `409 Conflict` — do **not** create a new row and do **not** cast a
-   vote. (This is a string-level check only; it won't catch two sequences
-   that are functionally equivalent but written differently — out of scope.)
-3. **Validate**: Lambda simulates the notation (supporting Singmaster
-   notation, `x y z` rotations, and lowercase wide moves — see notation
-   format above) against this case's known scramble state (from the
-   internal `Cases` table) and verifies it reaches solved. On failure,
-   reject with `422 Unprocessable Entity`. Nothing is created and no vote
-   is cast.
-4. **On success**: create the algorithm and **automatically cast the
+   noise to clean up. **Parentheses are preserved** in this cleaned string —
+   it's exactly what gets stored and returned (see §4 note on parentheses
+   above), since they're the submitter's own grouping and don't affect which
+   moves get applied.
+3. **Validate parentheses**: reject malformed grouping with `422
+   Unprocessable Entity` — unbalanced parens, nested parens, or a paren
+   glued directly to a move with no separating boundary (e.g. `R(U)R'`).
+   See §5 for the exact messages. Nothing is created and no vote is cast.
+4. **Reject duplicates**: check the cleaned string (parentheses included)
+   against the other algorithms already stored for this case. If one
+   matches exactly, reject with `409 Conflict` — do **not** create a new row
+   and do **not** cast a vote. This is a string-level check, so two
+   functionally-identical sequences written differently are **not** caught
+   as duplicates — that includes the same moves grouped with different
+   parentheses (e.g. `R U (R' U')` vs `R U R' U'`), which are intentionally
+   treated as distinct, separately-voteable entries since the grouping is a
+   meaningful part of what the submitter wrote.
+5. **Validate moves**: every move (after stripping parentheses, which never
+   affect this check) must be a real move for this case's `cubeType` — e.g.
+   a 2x2 case rejects lowercase wide moves and slice moves. On an invalid
+   move, reject with `422 Unprocessable Entity` — see §5 for the exact
+   message.
+6. **Validate solve**: Lambda simulates the (parenthesis-stripped) notation
+   (supporting Singmaster notation, `x y z` rotations, and lowercase wide
+   moves — see notation format above) against this case's known scramble
+   state (from the internal `Cases` table) and verifies it reaches solved.
+   On failure, reject with `422 Unprocessable Entity`. Nothing is created
+   and no vote is cast.
+7. **On success**: create the algorithm and **automatically cast the
    submitter's vote for it** (same effect as calling `PUT .../vote` with the
    new `algorithmId`) — so it's created with `votes: 1`, and if the
    submitting installation had a prior vote on this case, that old vote is
@@ -216,10 +243,16 @@ Submit a new algorithm proposal for a case.
 
 **Response 201**
 ```json
-{ "algorithmId": "a3", "notation": "R U R' U R U2 R'", "votes": 1 }
+{ "algorithmId": "a3", "notation": "(R U R') U R U2 R'", "votes": 1 }
 ```
 
-**Response 422**
+**Response 400** (see §5 for all 400 cases)
+```json
+{ "error": "invalid_request", "message": "notation must be at most 200 characters." }
+```
+
+**Response 422** — one of several messages under the same `invalid_algorithm`
+code; see §5 for the full list
 ```json
 { "error": "invalid_algorithm", "message": "Sequence does not solve this case." }
 ```
@@ -280,13 +313,64 @@ should confirm the right approach and its cost/throughput trade-offs.
 { "error": "<machine_readable_code>", "message": "<human readable>" }
 ```
 
-| Status | Meaning |
-|---|---|
-| 400 | Malformed request (missing installationId, bad path params) |
-| 404 | Unknown setId/caseId/algorithmId, or algorithmId doesn't belong to the given case |
-| 409 | Duplicate algorithm (normalized notation already submitted for this case) |
-| 422 | Notation failed cube-solve validation |
-| 500 | Unexpected server error |
+| Status | `error` code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed request (missing/invalid fields, bad path params, oversized notation) |
+| 404 | `not_found` | Unknown setId/caseId/algorithmId, or algorithmId doesn't belong to the given case |
+| 409 | `duplicate_algorithm` | Exact-string duplicate notation already submitted for this case |
+| 409 | `conflict` | Vote state changed concurrently between read and write; safe to retry |
+| 422 | `invalid_algorithm` | Notation is malformed or doesn't solve the case — see §5.1 for the specific messages |
+| 500 | `internal_error` | Unexpected server error |
+
+The `error` code is coarse and stable — build UI branching on it, not on
+`message` text (`message` wording may change). Where a single code covers
+several distinct situations (`invalid_request`, `invalid_algorithm`), §5.1
+lists every exact `message` currently produced, for cases where the UI
+wants to show something more specific than the generic code.
+
+### 5.1 Exact error messages by endpoint
+
+**`POST .../algorithms` (§4.3 submit)**
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 400 | `invalid_request` | `Missing or invalid setId/caseId path parameters.` | Path missing `setId` or `caseId`, or `caseId` isn't an integer |
+| 400 | `invalid_request` | `Missing or invalid "installationId"/"notation" field.` | Body missing `installationId` or `notation`, or either isn't a string |
+| 400 | `invalid_request` | `notation must be at most 200 characters.` | `notation` longer than 200 chars |
+| 404 | `not_found` | `Unknown algorithm set "<setId>".` | No such algorithm set |
+| 404 | `not_found` | `Unknown case <caseId> in algorithm set "<setId>".` | No such case in that set |
+| 422 | `invalid_algorithm` | `Unmatched "(" in notation.` | An opening paren has no matching close |
+| 422 | `invalid_algorithm` | `Unmatched ")" in notation.` | A closing paren has no matching open |
+| 422 | `invalid_algorithm` | `Nested parentheses are not supported.` | A paren group appears inside another |
+| 422 | `invalid_algorithm` | `Parentheses must wrap whole moves, not partial moves.` | A paren is glued directly to a move with no separating boundary (e.g. `R(U)R'`) |
+| 422 | `invalid_algorithm` | `"<move>" is not a valid move for a <cubeType> cube.` | A move isn't legal for this case's cube type (e.g. a slice move on a 2x2) |
+| 422 | `invalid_algorithm` | `Sequence does not solve this case.` | Notation is well-formed and all moves are legal, but simulating it against the scramble doesn't reach solved |
+| 409 | `duplicate_algorithm` | `This notation has already been submitted for this case.` | Exact-string match (parens included) with an existing algorithm for this case — response also includes the existing `algorithmId` |
+
+**`PUT .../vote` (§4.4)**
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 400 | `invalid_request` | `Missing or invalid setId/caseId path parameters.` | Path missing `setId` or `caseId`, or `caseId` isn't an integer |
+| 400 | `invalid_request` | `Missing or invalid "installationId"/"algorithmId" field.` | Body missing `installationId` or `algorithmId`, or either isn't a string |
+| 404 | `not_found` | `Unknown algorithmId "<algorithmId>" for case <caseId>.` | `algorithmId` doesn't exist, or belongs to a different case |
+| 409 | `conflict` | `Vote state changed concurrently; please retry.` | A concurrent vote/submission changed state between this request's read and write; safe to retry |
+
+**`GET .../top-algorithms` (§4.1) and `GET .../algorithms` (§4.2)**
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 400 | `invalid_request` | `Missing or invalid setId path parameter.` | Path missing `setId` (top-algorithms only) |
+| 400 | `invalid_request` | `Missing or invalid setId/caseId path parameters.` | Path missing `setId`/`caseId`, or `caseId` isn't an integer (list-algorithms only) |
+| 404 | `not_found` | `Unknown algorithm set "<setId>".` | No such algorithm set |
+| 404 | `not_found` | `Unknown case <caseId> in algorithm set "<setId>".` | No such case (list-algorithms only) |
+
+**Any endpoint**
+
+| Status | `error` | `message` | When |
+|---|---|---|---|
+| 404 | `not_found` | `Unknown route.` | Path doesn't match any defined route |
+| 500 | `internal_error` | `Unexpected server error.` | Uncaught exception (e.g. malformed JSON body) |
 
 ## 6. Seed data & future considerations
 
