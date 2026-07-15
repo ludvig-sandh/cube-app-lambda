@@ -15,7 +15,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { basename, join } from 'path';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import { normalizeNotation, invertNotation } from '../cube/notation';
+import { cleanNotation, invertNotation } from '../cube/notation';
 
 const SEED_DATA_DIR = join(__dirname, '..', '..', 'seed-data');
 
@@ -59,7 +59,7 @@ async function seedAlgorithmSet(setId: string, filePath: string, docClient: Dyna
 
     for (const [index, rawAlgorithm] of algorithms.entries()) {
         const caseId = index + 1;
-        const normalizedAlg = normalizeNotation(rawAlgorithm);
+        const displayAlg = cleanNotation(rawAlgorithm);
         const invertedAlg = invertNotation(rawAlgorithm);
 
         await docClient.send(
@@ -78,14 +78,14 @@ async function seedAlgorithmSet(setId: string, filePath: string, docClient: Dyna
                     // overwrites the same seeded default instead of piling
                     // up duplicates.
                     algorithmId: `${setId}-${caseId}-default`,
-                    notation: normalizedAlg,
+                    notation: displayAlg,
                     votes: 0,
                     createdAt: new Date().toISOString(),
                 },
             }),
         );
 
-        console.log(`Case ${caseId}: scramble="${invertedAlg}" default="${normalizedAlg}"`);
+        console.log(`Case ${caseId}: scramble="${invertedAlg}" default="${displayAlg}"`);
     }
 
     console.log(`Done: seeded ${algorithms.length} cases for ${setId}.`);
