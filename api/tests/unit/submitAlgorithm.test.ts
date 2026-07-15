@@ -113,17 +113,75 @@ describe('POST /algorithm-sets/{setId}/cases/{caseId}/algorithms', () => {
         expect(ddbMock.commandCalls(TransactWriteCommand)).toHaveLength(0);
     });
 
-    it('treats a duplicate check as a normalized-notation match (parens/whitespace ignored)', async () => {
+    it('still treats a duplicate check as a whitespace-insensitive match', async () => {
         ddbMock.on(QueryCommand, { TableName: 'Algorithms' }).resolves({
             Items: [{ setIdCaseId: SET_ID_CASE_ID, algorithmId: 'existing-algo', notation: SUNE, votes: 5 }],
         });
 
         const event = buildEvent({
-            body: JSON.stringify({ installationId: 'install-1', notation: "(R U R') U  R U2 R'" }),
+            body: JSON.stringify({ installationId: 'install-1', notation: "R U R'   U R U2 R'" }),
         });
         const result = await lambdaHandler(event);
 
         expect(result.statusCode).toEqual(409);
+    });
+
+    it('does not treat a different parenthesization of the same moves as a duplicate', async () => {
+        // Parens are a submitter's own memory aid for how to chunk the
+        // algorithm, so a differently-grouped submission of the same moves
+        // is a distinct, separately-voteable entry rather than a dupe.
+        ddbMock.on(QueryCommand, { TableName: 'Algorithms' }).resolves({
+            Items: [{ setIdCaseId: SET_ID_CASE_ID, algorithmId: 'existing-algo', notation: SUNE, votes: 5 }],
+        });
+
+        const event = buildEvent({
+            body: JSON.stringify({ installationId: 'install-1', notation: "(R U R') U R U2 R'" }),
+        });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(201);
+        const body = JSON.parse(result.body);
+        expect(body.notation).toEqual("(R U R') U R U2 R'");
+    });
+
+    it('stores the submitted parentheses instead of stripping them', async () => {
+        const event = buildEvent({
+            body: JSON.stringify({ installationId: 'install-1', notation: "(R U R') U R U2 R'" }),
+        });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(201);
+        const [transactCall] = ddbMock.commandCalls(TransactWriteCommand);
+        const items = transactCall.args[0].input.TransactItems ?? [];
+        expect(items[0].Put).toMatchObject({
+            TableName: 'Algorithms',
+            Item: { notation: "(R U R') U R U2 R'" },
+        });
+    });
+
+    it('returns 422 for unbalanced parentheses', async () => {
+        const event = buildEvent({ body: JSON.stringify({ installationId: 'install-1', notation: '(R U R\'' }) });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: 'Unmatched "(" in notation.',
+        });
+        expect(ddbMock.commandCalls(TransactWriteCommand)).toHaveLength(0);
+    });
+
+    it('returns 422 for nested parentheses', async () => {
+        const event = buildEvent({
+            body: JSON.stringify({ installationId: 'install-1', notation: "(R U (R' U2)) R'" }),
+        });
+        const result = await lambdaHandler(event);
+
+        expect(result.statusCode).toEqual(422);
+        expect(JSON.parse(result.body)).toEqual({
+            error: 'invalid_algorithm',
+            message: 'Nested parentheses are not supported.',
+        });
     });
 
     it('returns 422 when the algorithm does not solve the case', async () => {

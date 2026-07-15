@@ -1,9 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { docClient } from './db';
 import { NormalCube } from './cube/NormalCube';
-import { normalizeNotation, findInvalidMove } from './cube/notation';
+import { normalizeNotation, cleanNotation, findParenError, findInvalidMove } from './cube/notation';
 
 /**
  *
@@ -184,39 +185,57 @@ const castVote = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyRes
     const now = new Date().toISOString();
 
     // Move the vote atomically - see the note on TransactWriteItems in
-    // submitAlgorithm() above; same concern applies here.
-    await docClient.send(
-        new TransactWriteCommand({
-            TransactItems: [
-                {
-                    Update: {
-                        TableName: process.env.ALGORITHMS_TABLE_NAME!,
-                        Key: { setIdCaseId, algorithmId },
-                        UpdateExpression: 'SET votes = votes + :one',
-                        ExpressionAttributeValues: { ':one': 1 },
+    // submitAlgorithm() above; same concern applies here. The Put's
+    // ConditionExpression pins the write to the prior-vote state read
+    // above, so a concurrent request that already moved this
+    // installation's vote cancels this transaction instead of causing a
+    // double increment/decrement (which could otherwise drive votes
+    // negative).
+    try {
+        await docClient.send(
+            new TransactWriteCommand({
+                TransactItems: [
+                    {
+                        Update: {
+                            TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                            Key: { setIdCaseId, algorithmId },
+                            UpdateExpression: 'SET votes = votes + :one',
+                            ExpressionAttributeValues: { ':one': 1 },
+                        },
                     },
-                },
-                ...(priorAlgorithmId
-                    ? [
-                          {
-                              Update: {
-                                  TableName: process.env.ALGORITHMS_TABLE_NAME!,
-                                  Key: { setIdCaseId, algorithmId: priorAlgorithmId },
-                                  UpdateExpression: 'SET votes = votes - :one',
-                                  ExpressionAttributeValues: { ':one': 1 },
+                    ...(priorAlgorithmId
+                        ? [
+                              {
+                                  Update: {
+                                      TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                                      Key: { setIdCaseId, algorithmId: priorAlgorithmId },
+                                      UpdateExpression: 'SET votes = votes - :one',
+                                      ExpressionAttributeValues: { ':one': 1 },
+                                  },
                               },
-                          },
-                      ]
-                    : []),
-                {
-                    Put: {
-                        TableName: process.env.VOTES_TABLE_NAME!,
-                        Item: { installationId, setIdCaseId, algorithmId, votedAt: now },
+                          ]
+                        : []),
+                    {
+                        Put: {
+                            TableName: process.env.VOTES_TABLE_NAME!,
+                            Item: { installationId, setIdCaseId, algorithmId, votedAt: now },
+                            ConditionExpression: priorAlgorithmId
+                                ? 'algorithmId = :priorAlgorithmId'
+                                : 'attribute_not_exists(installationId)',
+                            ExpressionAttributeValues: priorAlgorithmId
+                                ? { ':priorAlgorithmId': priorAlgorithmId }
+                                : undefined,
+                        },
                     },
-                },
-            ],
-        }),
-    );
+                ],
+            }),
+        );
+    } catch (err) {
+        if (err instanceof TransactionCanceledException) {
+            return errorResponse(409, 'conflict', 'Vote state changed concurrently; please retry.');
+        }
+        throw err;
+    }
 
     return jsonResponse(200, { caseId, algorithmId, votes: currentVotes + 1 });
 };
@@ -236,6 +255,12 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
     }
     if (notation.length > MAX_NOTATION_LENGTH) {
         return errorResponse(400, 'invalid_request', `notation must be at most ${MAX_NOTATION_LENGTH} characters.`);
+    }
+
+    const displayNotation = cleanNotation(notation);
+    const parenError = findParenError(displayNotation);
+    if (parenError) {
+        return errorResponse(422, 'invalid_algorithm', parenError);
     }
 
     const normalizedProposal = normalizeNotation(notation);
@@ -290,7 +315,7 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
             ExpressionAttributeValues: { ':setIdCaseId': setIdCaseId },
         }),
     );
-    const duplicate = (existingAlgorithms.Items ?? []).find((item) => item.notation === normalizedProposal);
+    const duplicate = (existingAlgorithms.Items ?? []).find((item) => item.notation === displayNotation);
     if (duplicate) {
         return jsonResponse(409, {
             error: 'duplicate_algorithm',
@@ -312,39 +337,56 @@ const submitAlgorithm = async (event: APIGatewayProxyEvent): Promise<APIGatewayP
 
     // Create the algorithm and cast the submitter's auto-vote atomically -
     // TransactWriteItems (all-or-nothing) so a crash or concurrent request
-    // between these writes can never leave votes drifted from reality.
-    await docClient.send(
-        new TransactWriteCommand({
-            TransactItems: [
-                {
-                    Put: {
-                        TableName: process.env.ALGORITHMS_TABLE_NAME!,
-                        Item: { setIdCaseId, algorithmId, notation: normalizedProposal, votes: 1, createdAt: now },
+    // between these writes can never leave votes drifted from reality. The
+    // Put's ConditionExpression pins the write to the prior-vote state read
+    // above, so a concurrent request that already moved this
+    // installation's vote cancels this transaction instead of causing a
+    // double decrement (which could otherwise drive votes negative).
+    try {
+        await docClient.send(
+            new TransactWriteCommand({
+                TransactItems: [
+                    {
+                        Put: {
+                            TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                            Item: { setIdCaseId, algorithmId, notation: displayNotation, votes: 1, createdAt: now },
+                        },
                     },
-                },
-                ...(priorAlgorithmId
-                    ? [
-                          {
-                              Update: {
-                                  TableName: process.env.ALGORITHMS_TABLE_NAME!,
-                                  Key: { setIdCaseId, algorithmId: priorAlgorithmId },
-                                  UpdateExpression: 'SET votes = votes - :one',
-                                  ExpressionAttributeValues: { ':one': 1 },
+                    ...(priorAlgorithmId
+                        ? [
+                              {
+                                  Update: {
+                                      TableName: process.env.ALGORITHMS_TABLE_NAME!,
+                                      Key: { setIdCaseId, algorithmId: priorAlgorithmId },
+                                      UpdateExpression: 'SET votes = votes - :one',
+                                      ExpressionAttributeValues: { ':one': 1 },
+                                  },
                               },
-                          },
-                      ]
-                    : []),
-                {
-                    Put: {
-                        TableName: process.env.VOTES_TABLE_NAME!,
-                        Item: { installationId, setIdCaseId, algorithmId, votedAt: now },
+                          ]
+                        : []),
+                    {
+                        Put: {
+                            TableName: process.env.VOTES_TABLE_NAME!,
+                            Item: { installationId, setIdCaseId, algorithmId, votedAt: now },
+                            ConditionExpression: priorAlgorithmId
+                                ? 'algorithmId = :priorAlgorithmId'
+                                : 'attribute_not_exists(installationId)',
+                            ExpressionAttributeValues: priorAlgorithmId
+                                ? { ':priorAlgorithmId': priorAlgorithmId }
+                                : undefined,
+                        },
                     },
-                },
-            ],
-        }),
-    );
+                ],
+            }),
+        );
+    } catch (err) {
+        if (err instanceof TransactionCanceledException) {
+            return errorResponse(409, 'conflict', 'Vote state changed concurrently; please retry.');
+        }
+        throw err;
+    }
 
-    return jsonResponse(201, { algorithmId, notation: normalizedProposal, votes: 1 });
+    return jsonResponse(201, { algorithmId, notation: displayNotation, votes: 1 });
 };
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {

@@ -5,6 +5,46 @@ export function normalizeNotation(notation: string): string {
         .trim();
 }
 
+// Like normalizeNotation, but keeps parentheses - this is the form we
+// store/display, so a submitter's grouping (a memory aid for how to chunk
+// an algorithm) survives. Only whitespace is canonicalized.
+export function cleanNotation(notation: string): string {
+    return notation.replace(/\s+/g, ' ').trim();
+}
+
+// Parentheses are a purely cosmetic grouping hint - stripping them must
+// never change which moves get applied. That only holds if the grouping is
+// sane: balanced, a single level deep (no nesting), and never glued to a
+// move without a separating boundary (which would otherwise merge or split
+// move tokens once the parens are removed). Returns an error message, or
+// null if the notation's parentheses are fine.
+export function findParenError(notation: string): string | null {
+    let depth = 0;
+    for (const char of notation) {
+        if (char === '(') {
+            depth += 1;
+            if (depth > 1) {
+                return 'Nested parentheses are not supported.';
+            }
+        } else if (char === ')') {
+            depth -= 1;
+            if (depth < 0) {
+                return 'Unmatched ")" in notation.';
+            }
+        }
+    }
+    if (depth > 0) {
+        return 'Unmatched "(" in notation.';
+    }
+
+    const withParensRemoved = notation.replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
+    if (withParensRemoved !== normalizeNotation(notation)) {
+        return 'Parentheses must wrap whole moves, not partial moves.';
+    }
+
+    return null;
+}
+
 function invertMove(move: string): string {
     if (move.endsWith("'")) {
         return move.slice(0, -1);

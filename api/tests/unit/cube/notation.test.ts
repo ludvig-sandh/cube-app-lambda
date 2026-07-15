@@ -1,4 +1,4 @@
-import { normalizeNotation, invertNotation, findInvalidMove } from '../../../cube/notation';
+import { normalizeNotation, cleanNotation, findParenError, invertNotation, findInvalidMove } from '../../../cube/notation';
 import { expect, describe, it } from '@jest/globals';
 
 describe('normalizeNotation', () => {
@@ -16,6 +16,58 @@ describe('normalizeNotation', () => {
 
     it('handles a stray unmatched paren gracefully', () => {
         expect(normalizeNotation("R U' M)")).toBe("R U' M");
+    });
+});
+
+describe('cleanNotation', () => {
+    it('trims leading/trailing whitespace', () => {
+        expect(cleanNotation("  R U R'  ")).toBe("R U R'");
+    });
+
+    it('collapses internal whitespace runs to a single space', () => {
+        expect(cleanNotation("R    U\tR'")).toBe("R U R'");
+    });
+
+    it('keeps parentheses intact', () => {
+        expect(cleanNotation("(R U R') U (R' F R F')")).toBe("(R U R') U (R' F R F')");
+    });
+});
+
+describe('findParenError', () => {
+    it('accepts notation with no parentheses', () => {
+        expect(findParenError("R U R' U'")).toBeNull();
+    });
+
+    it('accepts a single balanced group hugging its moves', () => {
+        expect(findParenError("(R U R' U')")).toBeNull();
+    });
+
+    it('accepts multiple balanced groups separated by whitespace', () => {
+        expect(findParenError("(R U R') U (R' F R F')")).toBeNull();
+    });
+
+    it('accepts a group with internal spacing', () => {
+        expect(findParenError("( R U R' )")).toBeNull();
+    });
+
+    it('rejects an unmatched opening paren', () => {
+        expect(findParenError("(R U R' U'")).toBe('Unmatched "(" in notation.');
+    });
+
+    it('rejects an unmatched closing paren', () => {
+        expect(findParenError("R U R' U')")).toBe('Unmatched ")" in notation.');
+    });
+
+    it('rejects nested parentheses', () => {
+        expect(findParenError("(R U (R' U'))")).toBe('Nested parentheses are not supported.');
+    });
+
+    it('rejects a paren glued to a move without a boundary', () => {
+        expect(findParenError("R(U)R' U'")).toBe('Parentheses must wrap whole moves, not partial moves.');
+    });
+
+    it('rejects adjacent groups glued together with no separating space', () => {
+        expect(findParenError("(R U)(R' U')")).toBe('Parentheses must wrap whole moves, not partial moves.');
     });
 });
 
